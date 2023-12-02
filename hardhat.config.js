@@ -10,9 +10,10 @@ require("dotenv").config();
  * @type import('hardhat/config').HardhatUserConfig
  */
 
-const MAINNET_RPC_URL = process.env.MAINNET_RPC_URL || process.env.ALCHEMY_MAINNET_RPC_URL || "";
-const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x";
+const POLYGON_MAINNET_RPC_URL = process.env.POLYGON_MAINNET_RPC_URL || "";
+const POLYGON_MUMBAI_RPC_URL = process.env.POLYGON_MUMBAI_RPC_URL || "";
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
 const REPORT_GAS = process.env.REPORT_GAS || false;
@@ -22,18 +23,22 @@ module.exports = {
     networks: {
         hardhat: {
             chainId: 31337,
+            // forking: {
+            //     enabled: true,
+            //     url: `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+            // }
         },
         localhost: {
             chainId: 31337,
         },
-        sepolia: {
-            url: SEPOLIA_RPC_URL,
+        mumbai: {
+            url: POLYGON_MUMBAI_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
             saveDeployments: true,
             chainId: 11155111,
         },
         mainnet: {
-            url: MAINNET_RPC_URL,
+            url: POLYGON_MAINNET_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
             saveDeployments: true,
             chainId: 1,
@@ -69,6 +74,13 @@ module.exports = {
         compilers: [
             {
                 version: "0.8.8",
+                settings: {
+                    outputSelection: {
+                        "*": {
+                            "*": ["storageLayout"],
+                        }
+                    }
+                }
             }
         ]
     },
