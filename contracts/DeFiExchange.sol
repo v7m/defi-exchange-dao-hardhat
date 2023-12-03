@@ -15,8 +15,11 @@ error DeFiExchange__WithdrawETHFail();
 
 contract DeFiExchange is ReentrancyGuard {
     using SafeERC20 for IERC20;
-    
-    uint256 public constant LTV = 75;
+
+    uint8 public feePercentage = 1;
+    uint256 public s_totalEthFees = 0;
+    uint256 public s_totalDaiFees = 0;
+    uint256 public s_totalUsdtFees = 0;
 
     IERC20 public s_daiToken;
     IERC20 public s_usdtToken;
@@ -66,37 +69,55 @@ contract DeFiExchange is ReentrancyGuard {
     }
 
     function withdrawETH() external nonReentrant() {
-        uint256 amount = s_totalEthBalance[msg.sender];
-        if (amount <= 0) {
+        uint256 totalAmount = s_totalEthBalance[msg.sender];
+        if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawETHBalance();
         }
+        uint256 fee = calculateWithdrawalFee(totalAmount);
+        uint256 withdrawAmount = totalAmount - fee;
+        s_totalEthFees += fee;
         s_totalEthBalance[msg.sender] = 0;
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        (bool success, ) = payable(msg.sender).call{value: withdrawAmount}("");
         if (!success) {
             revert DeFiExchange__WithdrawETHFail();
         }
-        emit ETHWithdrawn(msg.sender, amount);
+        emit ETHWithdrawn(msg.sender, withdrawAmount);
     }
 
     function withdrawDAI() external nonReentrant() {
-        uint256 amount = s_totalDaiBalance[msg.sender];
-        if (amount <= 0) {
+        uint256 totalAmount = s_totalDaiBalance[msg.sender];
+        if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawDAIBalance();
         }
+        uint256 fee = calculateWithdrawalFee(totalAmount);
+        uint256 withdrawAmount = totalAmount - fee;
+        s_totalDaiFees += fee;
         s_totalDaiBalance[msg.sender] = 0;
-        s_daiToken.safeTransfer(msg.sender, amount);
-        emit DAIWithdrawn(msg.sender, amount);
+        s_daiToken.safeTransfer(msg.sender, withdrawAmount);
+        emit DAIWithdrawn(msg.sender, withdrawAmount);
     }
 
     function withdrawUSDT() external nonReentrant() {
-        uint256 amount = s_totalUsdtBalance[msg.sender];
-        if (amount <= 0) {
+        uint256 totalAmount = s_totalUsdtBalance[msg.sender];
+        if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawUSDTBalance();
         }
+        uint256 fee = calculateWithdrawalFee(totalAmount);
+        uint256 withdrawAmount = totalAmount - fee;
+        s_totalUsdtFees += fee;
         s_totalUsdtBalance[msg.sender] = 0;
-        s_usdtToken.safeTransfer(msg.sender, amount);
-        emit USDTWithdrawn(msg.sender, amount);
+        s_usdtToken.safeTransfer(msg.sender, withdrawAmount);
+        emit USDTWithdrawn(msg.sender, withdrawAmount);
     }
+
+
+    function calculateWithdrawalFee(uint256 amount) internal view returns (uint256) {
+        uint256 fee = (amount * feePercentage) / 100;
+
+        return fee;
+    }
+
+    // GETTER FUNCTIONS
 
     function getUserETHBalance(address user) external view returns (uint256) {
         return s_totalEthBalance[user];
