@@ -33,10 +33,10 @@ contract DeFiExchange is ReentrancyGuard {
     event USDTWithdrawn(address user, uint256 amount);
 
     constructor(
-        address s_daiTokenAddress,
+        address daiTokenAddress,
         address usdtTokenAddress
     ) {
-        s_daiToken = IERC20(s_daiTokenAddress);
+        s_daiToken = IERC20(daiTokenAddress);
         s_usdtToken = IERC20(usdtTokenAddress);
     }
 
