@@ -73,6 +73,7 @@ chai.use(smock.matchers)
 
             context("when caller is not contract owner", () => {
                 const withdrawFeePercentage = 99;
+
                 it("reverts transaction", async () => {
                     await expect(
                         deFiExchangeContract.connect(user).changeWithdrawFeePercentage(withdrawFeePercentage)

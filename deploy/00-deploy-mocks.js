@@ -1,21 +1,22 @@
 const { network } = require("hardhat");
+const { developmentChains } = require("../helper-hardhat-config");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log } = deployments;
     const { deployer } = await getNamedAccounts();
-    const chainId = network.config.chainId;
 
-    if (chainId == 31337) {
-        log("Local network detected! Deploying mocks...");
+    if (developmentChains.includes(network.name)) {
+        log("----------------------------------------------------------");
+        log("Deploying ERC20TokenMock to local network...");
+
         await deploy("ERC20TokenMock", {
             from: deployer,
             log: true,
             args: [],
         });
 
-        log("----------------------------------------------------------");
-        log("Mocks Deployed!");
+        log("ERC20TokenMock contract deployed!");
         log("----------------------------------------------------------");
     }
 }
-module.exports.tags = ["all", "mocks", "main"];
+module.exports.tags = ["all", "mocks", "ERC20TokenMock"];
