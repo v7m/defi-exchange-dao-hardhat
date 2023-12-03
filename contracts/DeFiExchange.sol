@@ -5,6 +5,7 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 error DeFiExchange__InsufficientDepositDAIBalance();
 error DeFiExchange__InsufficientWithdrawDAIBalance();
@@ -12,11 +13,12 @@ error DeFiExchange__InsufficientDepositUSDTBalance();
 error DeFiExchange__InsufficientWithdrawUSDTBalance();
 error DeFiExchange__InsufficientWithdrawETHBalance();
 error DeFiExchange__WithdrawETHFail();
+error DeFiExchange__InvalidNewWithdrawFeePercentage();
 
-contract DeFiExchange is ReentrancyGuard {
+contract DeFiExchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
-    uint8 public feePercentage = 1;
+    uint8 public s_withdrawFeePercentage;
     uint256 public s_totalEthFees = 0;
     uint256 public s_totalDaiFees = 0;
     uint256 public s_totalUsdtFees = 0;
@@ -34,13 +36,24 @@ contract DeFiExchange is ReentrancyGuard {
     event DAIWithdrawn(address user, uint256 amount);
     event USDTDeposited(address user, uint256 amount);
     event USDTWithdrawn(address user, uint256 amount);
+    event WithdrawFeePercentageChanged(uint8 newWithdrawFeePercentage);
 
     constructor(
         address daiTokenAddress,
-        address usdtTokenAddress
+        address usdtTokenAddress,
+        uint8 withdrawFeePercentage
     ) {
         s_daiToken = IERC20(daiTokenAddress);
         s_usdtToken = IERC20(usdtTokenAddress);
+        s_withdrawFeePercentage = withdrawFeePercentage;
+    }
+
+    function changeWithdrawFeePercentage(uint8 _withdrawFeePercentage) external onlyOwner {
+        if (_withdrawFeePercentage > 100) {
+            revert DeFiExchange__InvalidNewWithdrawFeePercentage();
+        }
+        s_withdrawFeePercentage = _withdrawFeePercentage;
+        emit WithdrawFeePercentageChanged(s_withdrawFeePercentage);
     }
 
     function depositETH() external payable {
@@ -112,12 +125,16 @@ contract DeFiExchange is ReentrancyGuard {
 
 
     function calculateWithdrawalFee(uint256 amount) internal view returns (uint256) {
-        uint256 fee = (amount * feePercentage) / 100;
+        uint256 fee = (amount * s_withdrawFeePercentage) / 100;
 
         return fee;
     }
 
     // GETTER FUNCTIONS
+
+    function getWithdrawFeePercentage() external view returns (uint8) {
+        return s_withdrawFeePercentage;
+    }
 
     function getUserETHBalance(address user) external view returns (uint256) {
         return s_totalEthBalance[user];

@@ -9,18 +9,19 @@ chai.use(smock.matchers)
 !developmentChains.includes(network.name)
     ? describe.skip
     : describe("DeFiExchange Unit Tests", () => {
-        let ERC20TokenMockContractFactory, daiTokenMockContract, usdtTokenMockContract,
+        let accounts, deployer, user, ERC20TokenMockContractFactory, daiTokenMockContract, usdtTokenMockContract,
             deFiExchangeContract, deFiExchangeContractFactory;
+
+        const tokenAmount = ethers.utils.parseUnits("100", 18);
 
         beforeEach(async () => {
             accounts = await ethers.getSigners();
             deployer = accounts[0];
+            user = accounts[1]
 
             ERC20TokenMockContractFactory = await ethers.getContractFactory("ERC20TokenMock");
             daiTokenMockContract = await smock.fake(ERC20TokenMockContractFactory);
             usdtTokenMockContract = await smock.fake(ERC20TokenMockContractFactory);
-
-            const tokenAmount = ethers.utils.parseUnits("100", 18);
 
             daiTokenMockContract.allowance.returns(tokenAmount);
             usdtTokenMockContract.allowance.returns(tokenAmount);
@@ -29,12 +30,55 @@ chai.use(smock.matchers)
             daiTokenMockContract.transfer.returns(true);
             usdtTokenMockContract.transfer.returns(true);
 
+            const withdrawFeePercentage = 1;
+
             deFiExchangeContractFactory = await ethers.getContractFactory("DeFiExchange");
             deFiExchangeContract = await deFiExchangeContractFactory.deploy(
                 daiTokenMockContract.address,
-                usdtTokenMockContract.address
+                usdtTokenMockContract.address,
+                withdrawFeePercentage
             );
             await deFiExchangeContract.deployed();
+        });
+
+        describe("changeWithdrawFeePercentage", async () => {
+            context("when caller is contract owner", () => {
+                context("when new value is less then 100", () => {
+                    const withdrawFeePercentage = 99;
+
+                    it("updates s_withdrawFeePercentage", async () => {
+                        await deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage);
+                        const withdrawFee = await deFiExchangeContract.s_withdrawFeePercentage();
+
+                        expect(withdrawFee).to.eq(withdrawFeePercentage);
+                    });
+
+                    it("emits event WithdrawFeePercentageChanged", async () => {
+                        expect(
+                            await deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage)
+                        ).to.emit("WithdrawFeePercentageChanged");
+                    });
+                });
+
+                context("when fee is greater then 100", () => {
+                    const withdrawFeePercentage = 101;
+
+                    it("reverts transaction", async () => {
+                        await expect(
+                            deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage)
+                        ).to.be.revertedWith("DeFiExchange__InvalidNewWithdrawFeePercentage");
+                    });
+                });
+            });
+
+            context("when caller is not contract owner", () => {
+                const withdrawFeePercentage = 99;
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.connect(user).changeWithdrawFeePercentage(withdrawFeePercentage)
+                    ).to.be.revertedWith("Ownable: caller is not the owner");
+                });
+            });
         });
 
         describe("depositETH", async () => {
