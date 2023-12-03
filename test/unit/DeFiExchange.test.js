@@ -8,43 +8,46 @@ chai.use(smock.matchers)
 
 !developmentChains.includes(network.name)
     ? describe.skip
-    : describe("DeFi Exchange Unit Tests", () => {
-        let IERC20Artifact, deFiExchange, deFiExchangeContract, daiTokenContractMock, usdtTokenContractMock;
+    : describe("DeFiExchange Unit Tests", () => {
+        let ERC20TokenMockContractFactory, daiTokenMockContract, usdtTokenMockContract,
+            deFiExchangeContract, deFiExchangeContractFactory;
 
         beforeEach(async () => {
             accounts = await ethers.getSigners();
             deployer = accounts[0];
 
-            IERC20Artifact = await hre.artifacts.readArtifact("IERC20");
+            ERC20TokenMockContractFactory = await ethers.getContractFactory("ERC20TokenMock");
+            daiTokenMockContract = await smock.fake(ERC20TokenMockContractFactory);
+            usdtTokenMockContract = await smock.fake(ERC20TokenMockContractFactory);
 
-            daiTokenContractMock = await smock.fake(IERC20Artifact.abi);
-            usdtTokenContractMock = await smock.fake(IERC20Artifact.abi);
+            daiTokenMockContract.allowance.returns(5);
+            usdtTokenMockContract.allowance.returns(5);
+            daiTokenMockContract.transferFrom.returns(true);
+            usdtTokenMockContract.transferFrom.returns(true);
+            daiTokenMockContract.transfer.returns(true);
+            usdtTokenMockContract.transfer.returns(true);
 
-            daiTokenContractMock.allowance.returns(5);
-            usdtTokenContractMock.allowance.returns(5);
-            daiTokenContractMock.transferFrom.returns(true);
-            usdtTokenContractMock.transferFrom.returns(true);
-            daiTokenContractMock.transfer.returns(true);
-            usdtTokenContractMock.transfer.returns(true);
-
-            deFiExchangeContract = await ethers.getContractFactory("DeFiExchange");
-            deFiExchange = await deFiExchangeContract.deploy(daiTokenContractMock.address, usdtTokenContractMock.address);
-            await deFiExchange.deployed();
+            deFiExchangeContractFactory = await ethers.getContractFactory("DeFiExchange");
+            deFiExchangeContract = await deFiExchangeContractFactory.deploy(
+                daiTokenMockContract.address,
+                usdtTokenMockContract.address
+            );
+            await deFiExchangeContract.deployed();
         });
 
         describe("depositETH", async () => {
             const amount = ethers.utils.parseEther("1.0"); 
 
             it("updates user's ETH balance", async () => {
-                await deFiExchange.depositETH({ value: amount });
-                const totalBalance = await deFiExchange.s_totalEthBalance(deployer.address);
+                await deFiExchangeContract.depositETH({ value: amount });
+                const totalBalance = await deFiExchangeContract.s_totalEthBalance(deployer.address);
                 
                 expect(totalBalance).to.eq(amount);
             });
 
             it("emits event ETHDeposited", async () => {
                 expect(
-                    await deFiExchange.depositETH({ value: amount })
+                    await deFiExchangeContract.depositETH({ value: amount })
                 ).to.emit("ETHDeposited");
             });
         });
@@ -54,23 +57,23 @@ chai.use(smock.matchers)
                 const amount = 5; 
 
                 it("updates user's DAI balance", async function() {
-                    await deFiExchange.depositDAI(amount);
+                    await deFiExchangeContract.depositDAI(amount);
                     
                     expect(
-                        daiTokenContractMock.allowance
-                    ).to.have.been.calledWith(deployer.address, deFiExchange.address);
+                        daiTokenMockContract.allowance
+                    ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address);
                     expect(
-                        daiTokenContractMock.transferFrom
-                    ).to.have.been.calledWith(deployer.address, deFiExchange.address, amount);
+                        daiTokenMockContract.transferFrom
+                    ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address, amount);
                     
-                    const totalBalance = await deFiExchange.s_totalDaiBalance(deployer.address);
+                    const totalBalance = await deFiExchangeContract.s_totalDaiBalance(deployer.address);
 
                     expect(totalBalance).to.eq(amount);
                 });
 
                 it("emits event DAIDeposited", async function() {
                     expect(
-                        await deFiExchange.depositDAI(amount)
+                        await deFiExchangeContract.depositDAI(amount)
                     ).to.emit("DAIDeposited");
                 });
             });
@@ -80,7 +83,7 @@ chai.use(smock.matchers)
 
                 it("reverts transaction", async function () {
                     await expect(
-                        deFiExchange.depositDAI(amount)
+                        deFiExchangeContract.depositDAI(amount)
                     ).to.be.revertedWith("DeFiExchange__InsufficientDepositDAIBalance");
                 });
             });
@@ -91,23 +94,23 @@ chai.use(smock.matchers)
                 const amount = 5; 
 
                 it("updates user's USDT balance", async function() {
-                    await deFiExchange.depositUSDT(amount);
+                    await deFiExchangeContract.depositUSDT(amount);
 
                     expect(
-                        usdtTokenContractMock.allowance
-                    ).to.have.been.calledWith(deployer.address, deFiExchange.address);
+                        usdtTokenMockContract.allowance
+                    ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address);
                     expect(
-                        usdtTokenContractMock.transferFrom
-                    ).to.have.been.calledWith(deployer.address, deFiExchange.address, amount);
+                        usdtTokenMockContract.transferFrom
+                    ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address, amount);
 
-                    const totalBalance = await deFiExchange.s_totalUsdtBalance(deployer.address);
+                    const totalBalance = await deFiExchangeContract.s_totalUsdtBalance(deployer.address);
 
                     expect(totalBalance).to.eq(amount);
                 });
 
                 it("emits event USDTDeposited", async function() {
                     expect(
-                        await deFiExchange.depositUSDT(amount)
+                        await deFiExchangeContract.depositUSDT(amount)
                     ).to.emit("USDTDeposited");
                 });
             });
@@ -117,7 +120,7 @@ chai.use(smock.matchers)
 
                 it("reverts transaction", async function () {
                     await expect(
-                        deFiExchange.depositUSDT(amount)
+                        deFiExchangeContract.depositUSDT(amount)
                     ).to.be.revertedWith("DeFiExchange__InsufficientDepositUSDTBalance");
                 });
             });
@@ -128,13 +131,13 @@ chai.use(smock.matchers)
                 const amount = ethers.utils.parseEther("1.0");
 
                 beforeEach(async () => {
-                    await deFiExchange.depositETH({ value: amount });
+                    await deFiExchangeContract.depositETH({ value: amount });
                 });
 
                 it("withdraws amount", async function () {
-                    const userAmountBefore = await deFiExchange.s_totalEthBalance(deployer.address);
+                    const userAmountBefore = await deFiExchangeContract.s_totalEthBalance(deployer.address);
                     const userBalanceBefore = await deployer.getBalance();
-                    const txResponse = await deFiExchange.withdrawETH();
+                    const txResponse = await deFiExchangeContract.withdrawETH();
                     const transactionReceipt = await txResponse.wait(1);
                     const { gasUsed, effectiveGasPrice } = transactionReceipt;
                     const gasCost = gasUsed.mul(effectiveGasPrice);
@@ -147,7 +150,7 @@ chai.use(smock.matchers)
 
                 it("emits event ETHWithdrawn", async function() {
                     expect(
-                        await deFiExchange.withdrawETH()
+                        await deFiExchangeContract.withdrawETH()
                     ).to.emit("ETHWithdrawn");
                 });
             });
@@ -155,7 +158,7 @@ chai.use(smock.matchers)
             context("when amount is 0", () => {
                 it("reverts transaction", async function () {
                     await expect(
-                        deFiExchange.withdrawETH()
+                        deFiExchangeContract.withdrawETH()
                     ).to.be.revertedWith("DeFiExchange__InsufficientWithdrawETHBalance");
                 });
             });
@@ -166,28 +169,28 @@ chai.use(smock.matchers)
                 const amount = 5;
 
                 beforeEach(async () => {
-                    await deFiExchange.depositDAI(amount);
+                    await deFiExchangeContract.depositDAI(amount);
                 });
 
                 it("withdraws amount", async function () {
-                    const userAmountBefore = await deFiExchange.s_totalDaiBalance(deployer.address);
+                    const userAmountBefore = await deFiExchangeContract.s_totalDaiBalance(deployer.address);
 
                     expect(userAmountBefore.toString()).to.eq("5");
 
-                    await deFiExchange.withdrawDAI();
+                    await deFiExchangeContract.withdrawDAI();
 
                     expect(
-                        daiTokenContractMock.transfer
+                        daiTokenMockContract.transfer
                     ).to.have.been.calledWith(deployer.address, amount);
 
-                    const userAmountAfter = await deFiExchange.s_totalDaiBalance(deployer.address);
+                    const userAmountAfter = await deFiExchangeContract.s_totalDaiBalance(deployer.address);
 
                     expect(userAmountAfter.toString()).to.eq("0");
                 });
 
                 it("emits event DAIWithdrawn", async function() {
                     expect(
-                        await deFiExchange.withdrawDAI()
+                        await deFiExchangeContract.withdrawDAI()
                     ).to.emit("DAIWithdrawn");
                 });
             });
@@ -195,7 +198,7 @@ chai.use(smock.matchers)
             context("when amount is 0", () => {
                 it("reverts transaction", async function () {
                     await expect(
-                        deFiExchange.withdrawDAI()
+                        deFiExchangeContract.withdrawDAI()
                     ).to.be.revertedWith("DeFiExchange__InsufficientWithdrawDAIBalance");
                 });
             });
@@ -206,28 +209,28 @@ chai.use(smock.matchers)
                 const amount = 5;
 
                 beforeEach(async () => {
-                    await deFiExchange.depositUSDT(amount);
+                    await deFiExchangeContract.depositUSDT(amount);
                 });
 
                 it("withdraws amount", async function () {
-                    const userAmountBefore = await deFiExchange.s_totalUsdtBalance(deployer.address);
+                    const userAmountBefore = await deFiExchangeContract.s_totalUsdtBalance(deployer.address);
 
                     expect(userAmountBefore.toString()).to.eq("5");
 
-                    await deFiExchange.withdrawUSDT();
+                    await deFiExchangeContract.withdrawUSDT();
 
                     expect(
-                        usdtTokenContractMock.transfer
+                        usdtTokenMockContract.transfer
                     ).to.have.been.calledWith(deployer.address, amount);
 
-                    const userAmountAfter = await deFiExchange.s_totalUsdtBalance(deployer.address);
+                    const userAmountAfter = await deFiExchangeContract.s_totalUsdtBalance(deployer.address);
 
                     expect(userAmountAfter.toString()).to.eq("0");
                 });
 
                 it("emits event USDTWithdrawn", async function() {
                     expect(
-                        await deFiExchange.withdrawUSDT()
+                        await deFiExchangeContract.withdrawUSDT()
                     ).to.emit("USDTWithdrawn");
                 });
             });
@@ -235,7 +238,7 @@ chai.use(smock.matchers)
             context("when amount is 0", () => {
                 it("reverts transaction", async function () {
                     await expect(
-                        deFiExchange.withdrawUSDT()
+                        deFiExchangeContract.withdrawUSDT()
                     ).to.be.revertedWith("DeFiExchange__InsufficientWithdrawUSDTBalance");
                 });
             });
