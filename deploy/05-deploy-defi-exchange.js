@@ -7,9 +7,21 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deployer } = await getNamedAccounts();
     const chainId = network.config.chainId;
     const waitBlockConfirmations = networkConfig[network.name]["blockConfirmations"] || 1;
+    let DAITokenMockContract, USDTTokenMockContract, daiContractAddress, usdtContractAddress;
+
+    if (developmentChains.includes(network.name)) {
+        DAITokenMockContract = await ethers.getContract("DAITokenMock");
+        USDTTokenMockContract = await ethers.getContract("USDTTokenMock");
+        daiContractAddress = DAITokenMockContract.address;
+        usdtContractAddress = USDTTokenMockContract.address;
+    } else {
+        daiContractAddress = networkConfig[chainId]["daiContractAddress"];
+        usdtContractAddress = networkConfig[chainId]["usdtContractAddress"];
+    }
+
     const args = [
-        networkConfig[chainId]["daiContractAddress"],
-        networkConfig[chainId]["usdtContractAddress"],
+        daiContractAddress,
+        usdtContractAddress,
         WITHDRAW_FEE_PERCENTAGE,
     ];
 

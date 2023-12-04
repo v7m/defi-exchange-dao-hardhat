@@ -7,15 +7,24 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 
     if (developmentChains.includes(network.name)) {
         log("----------------------------------------------------------");
-        log("Deploying ERC20TokenMock to local network...");
+        log("Deploying DAITokenMock to local network...");
 
-        await deploy("ERC20TokenMock", {
+        await deploy("DAITokenMock", {
             from: deployer,
             log: true,
             args: [],
         });
 
-        log("ERC20TokenMock contract deployed!");
+        log("DAITokenMock contract deployed!");
+        log("Deploying USDTTokenMock to local network...");
+
+        await deploy("USDTTokenMock", {
+            from: deployer,
+            log: true,
+            args: [],
+        });
+
+        log("USDTTokenMock contract deployed!");
         log("----------------------------------------------------------");
     }
 }

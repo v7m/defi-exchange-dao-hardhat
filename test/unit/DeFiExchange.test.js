@@ -9,9 +9,10 @@ chai.use(smock.matchers)
 !developmentChains.includes(network.name)
     ? describe.skip
     : describe("DeFiExchange Unit Tests", () => {
-        let accounts, deployer, user, ERC20TokenMockContractFactory, daiTokenMockContract, usdtTokenMockContract,
-            deFiExchangeContract, deFiExchangeContractFactory;
+        let accounts, deployer, user, DAITokenMockContractFactory, USDTTokenMockContractFactory, 
+            daiTokenMockContract, usdtTokenMockContract, deFiExchangeContract, deFiExchangeContractFactory;
 
+        const withdrawFeePercentage = 1;
         const tokenAmount = ethers.utils.parseUnits("100", 18);
 
         beforeEach(async () => {
@@ -19,9 +20,10 @@ chai.use(smock.matchers)
             deployer = accounts[0];
             user = accounts[1]
 
-            ERC20TokenMockContractFactory = await ethers.getContractFactory("ERC20TokenMock");
-            daiTokenMockContract = await smock.fake(ERC20TokenMockContractFactory);
-            usdtTokenMockContract = await smock.fake(ERC20TokenMockContractFactory);
+            DAITokenMockContractFactory = await ethers.getContractFactory("DAITokenMock");
+            USDTTokenMockContractFactory = await ethers.getContractFactory("USDTTokenMock");
+            daiTokenMockContract = await smock.fake(DAITokenMockContractFactory);
+            usdtTokenMockContract = await smock.fake(USDTTokenMockContractFactory);
 
             daiTokenMockContract.allowance.returns(tokenAmount);
             usdtTokenMockContract.allowance.returns(tokenAmount);
@@ -29,8 +31,6 @@ chai.use(smock.matchers)
             usdtTokenMockContract.transferFrom.returns(true);
             daiTokenMockContract.transfer.returns(true);
             usdtTokenMockContract.transfer.returns(true);
-
-            const withdrawFeePercentage = 1;
 
             deFiExchangeContractFactory = await ethers.getContractFactory("DeFiExchange");
             deFiExchangeContract = await deFiExchangeContractFactory.deploy(
