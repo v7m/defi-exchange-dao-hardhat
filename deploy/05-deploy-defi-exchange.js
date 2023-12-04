@@ -29,6 +29,14 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     }
 
     log("DeFiExchange contract deployed!");
+    log("Transferring ownership of DeFiExchange contract to TimeLock contact...");
+
+    const deFiExchangeContract = await ethers.getContractAt("DeFiExchange", deFiExchange.address);
+    const timeLock = await ethers.getContract("TimeLock");
+    const transferTx = await deFiExchangeContract.transferOwnership(timeLock.address);
+    await transferTx.wait(1);
+
+    log("Transferring ownership finished!");
     log("----------------------------------------------------------");
 }
 
