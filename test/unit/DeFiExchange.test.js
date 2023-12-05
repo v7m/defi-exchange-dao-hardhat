@@ -10,7 +10,7 @@ chai.use(smock.matchers)
     ? describe.skip
     : describe("DeFiExchange Unit Tests", () => {
         let accounts, deployer, user, DAITokenMockContractFactory, USDTTokenMockContractFactory, 
-            daiTokenMockContract, usdtTokenMockContract, deFiExchangeContract, deFiExchangeContractFactory,
+            DAITokenMockContract, USDTTokenMockContract, deFiExchangeContract, deFiExchangeContractFactory,
             governanceTokenContract, governanceTokenContractFactory;
 
         const withdrawFeePercentage = 1;
@@ -26,23 +26,23 @@ chai.use(smock.matchers)
 
             DAITokenMockContractFactory = await ethers.getContractFactory("DAITokenMock");
             USDTTokenMockContractFactory = await ethers.getContractFactory("USDTTokenMock");
-            daiTokenMockContract = await smock.fake(DAITokenMockContractFactory);
-            usdtTokenMockContract = await smock.fake(USDTTokenMockContractFactory);
+            DAITokenMockContract = await smock.fake(DAITokenMockContractFactory);
+            USDTTokenMockContract = await smock.fake(USDTTokenMockContractFactory);
 
-            daiTokenMockContract.allowance.returns(amount);
-            usdtTokenMockContract.allowance.returns(amount);
-            daiTokenMockContract.transferFrom.returns(true);
-            usdtTokenMockContract.transferFrom.returns(true);
-            daiTokenMockContract.transfer.returns(true);
-            usdtTokenMockContract.transfer.returns(true);
+            DAITokenMockContract.allowance.returns(amount);
+            USDTTokenMockContract.allowance.returns(amount);
+            DAITokenMockContract.transferFrom.returns(true);
+            USDTTokenMockContract.transferFrom.returns(true);
+            DAITokenMockContract.transfer.returns(true);
+            USDTTokenMockContract.transfer.returns(true);
 
             governanceTokenContractFactory = await ethers.getContractFactory("GovernanceToken");
             governanceTokenContract = await smock.fake(governanceTokenContractFactory);
 
             deFiExchangeContractFactory = await ethers.getContractFactory("DeFiExchange");
             deFiExchangeContract = await deFiExchangeContractFactory.deploy(
-                daiTokenMockContract.address,
-                usdtTokenMockContract.address,
+                DAITokenMockContract.address,
+                USDTTokenMockContract.address,
                 governanceTokenContract.address,
                 withdrawFeePercentage,
                 stakingToGovernancePercentage
@@ -216,10 +216,10 @@ chai.use(smock.matchers)
                     await deFiExchangeContract.depositDAI(amount);
                     
                     expect(
-                        daiTokenMockContract.allowance
+                        DAITokenMockContract.allowance
                     ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address);
                     expect(
-                        daiTokenMockContract.transferFrom
+                        DAITokenMockContract.transferFrom
                     ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address, amount);
                     
                     const totalBalance = await deFiExchangeContract.s_totalDaiBalance(deployer.address);
@@ -253,10 +253,10 @@ chai.use(smock.matchers)
                     await deFiExchangeContract.depositUSDT(amount);
 
                     expect(
-                        usdtTokenMockContract.allowance
+                        USDTTokenMockContract.allowance
                     ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address);
                     expect(
-                        usdtTokenMockContract.transferFrom
+                        USDTTokenMockContract.transferFrom
                     ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address, amount);
 
                     const totalBalance = await deFiExchangeContract.s_totalUsdtBalance(deployer.address);
@@ -350,7 +350,7 @@ chai.use(smock.matchers)
                     await deFiExchangeContract.withdrawDAI();
 
                     expect(
-                        daiTokenMockContract.transfer
+                        DAITokenMockContract.transfer
                     ).to.have.been.calledWith(deployer.address, withdrawAmount);
 
                     const userAmountAfter = await deFiExchangeContract.s_totalDaiBalance(deployer.address);
@@ -403,7 +403,7 @@ chai.use(smock.matchers)
                     await deFiExchangeContract.withdrawUSDT();
 
                     expect(
-                        usdtTokenMockContract.transfer
+                        USDTTokenMockContract.transfer
                     ).to.have.been.calledWith(deployer.address, withdrawAmount);
 
                     const userAmountAfter = await deFiExchangeContract.s_totalUsdtBalance(deployer.address);

@@ -12,23 +12,23 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deployer } = await getNamedAccounts();
     const chainId = network.config.chainId;
     const waitBlockConfirmations = networkConfig[network.name]["blockConfirmations"] || 1;
-    let DAITokenMockContract, USDTTokenMockContract, governanceTokenContract, daiContractAddress, usdtContractAddress;
+    let DAITokenMockContract, USDTTokenMockContract, governanceTokenContract, DAIContractAddress, USDTContractAddress;
 
     if (developmentChains.includes(network.name)) {
         DAITokenMockContract = await ethers.getContract("DAITokenMock");
         USDTTokenMockContract = await ethers.getContract("USDTTokenMock");
-        daiContractAddress = DAITokenMockContract.address;
-        usdtContractAddress = USDTTokenMockContract.address;
+        DAIContractAddress = DAITokenMockContract.address;
+        USDTContractAddress = USDTTokenMockContract.address;
     } else {
-        daiContractAddress = networkConfig[chainId]["daiContractAddress"];
-        usdtContractAddress = networkConfig[chainId]["usdtContractAddress"];
+        DAIContractAddress = networkConfig[chainId]["DAIContractAddress"];
+        USDTContractAddress = networkConfig[chainId]["USDTContractAddress"];
     }
 
     governanceTokenContract = await ethers.getContract("GovernanceToken");
 
     const args = [
-        daiContractAddress,
-        usdtContractAddress,
+        DAIContractAddress,
+        USDTContractAddress,
         governanceTokenContract.address,
         WITHDRAW_FEE_PERCENTAGE,
         STAKING_TO_GOVERNANCE_PERCENTAGE,

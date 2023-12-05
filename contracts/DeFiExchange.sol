@@ -29,8 +29,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     uint256 public s_totalDaiFees = 0;
     uint256 public s_totalUsdtFees = 0;
 
-    IERC20 public s_daiToken;
-    IERC20 public s_usdtToken;
+    IERC20 public s_DAIToken;
+    IERC20 public s_USDTToken;
     GovernanceToken public s_governanceToken;
 
     mapping(address => uint256) public s_totalEthStaking;
@@ -49,14 +49,14 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     event WithdrawStakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
 
     constructor(
-        address daiTokenAddress,
-        address usdtTokenAddress,
+        address DAITokenAddress,
+        address USDTTokenAddress,
         address governanceTokenAddress,
         uint8 withdrawFeePercentage,
         uint8 stakingToGovernancePercentage
     ) {
-        s_daiToken = IERC20(daiTokenAddress);
-        s_usdtToken = IERC20(usdtTokenAddress);
+        s_DAIToken = IERC20(DAITokenAddress);
+        s_USDTToken = IERC20(USDTTokenAddress);
         s_governanceToken = GovernanceToken(governanceTokenAddress);
         s_withdrawFeePercentage = withdrawFeePercentage;
         s_stakingToGovernancePercentage = stakingToGovernancePercentage;
@@ -113,21 +113,21 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     }
 
     function depositDAI(uint256 _amount) external {
-        if (s_daiToken.allowance(msg.sender, address(this)) < _amount) {
+        if (s_DAIToken.allowance(msg.sender, address(this)) < _amount) {
             revert DeFiExchange__InsufficientDepositDAIBalance();
         }
 
-        s_daiToken.safeTransferFrom(msg.sender, address(this), _amount);
+        s_DAIToken.safeTransferFrom(msg.sender, address(this), _amount);
         s_totalDaiBalance[msg.sender] += _amount;
         emit DAIDeposited(msg.sender, _amount);
     }
 
     function depositUSDT(uint256 _amount) external {
-        if (s_usdtToken.allowance(msg.sender, address(this)) < _amount) {
+        if (s_USDTToken.allowance(msg.sender, address(this)) < _amount) {
             revert DeFiExchange__InsufficientDepositUSDTBalance();
         }
 
-        s_usdtToken.safeTransferFrom(msg.sender, address(this), _amount);
+        s_USDTToken.safeTransferFrom(msg.sender, address(this), _amount);
         s_totalUsdtBalance[msg.sender] += _amount;
         emit USDTDeposited(msg.sender, _amount);
     }
@@ -159,7 +159,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         uint256 withdrawAmount = totalAmount - fee;
         s_totalDaiFees += fee;
         s_totalDaiBalance[msg.sender] = 0;
-        s_daiToken.safeTransfer(msg.sender, withdrawAmount);
+        s_DAIToken.safeTransfer(msg.sender, withdrawAmount);
         emit DAIWithdrawn(msg.sender, withdrawAmount);
     }
 
@@ -172,7 +172,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         uint256 withdrawAmount = totalAmount - fee;
         s_totalUsdtFees += fee;
         s_totalUsdtBalance[msg.sender] = 0;
-        s_usdtToken.safeTransfer(msg.sender, withdrawAmount);
+        s_USDTToken.safeTransfer(msg.sender, withdrawAmount);
         emit USDTWithdrawn(msg.sender, withdrawAmount);
     }
 

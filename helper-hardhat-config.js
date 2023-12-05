@@ -39,20 +39,20 @@ const networkConfig = {
     [LOCALHOST_CHAIN_ID]: {
         name: "localhost",
         blockConfirmations: LOCAL_NETWORK_BLOCK_CONFIRMATIONS,
-        usdtContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
-        daiContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
+        USDTContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
+        DAIContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
     },
     [MUMBAI_CHAIN_ID]: {
         name: "mumbai",
         blockConfirmations: BLOCK_CONFIRMATIONS,
-        usdtContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
-        daiContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
+        USDTContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
+        DAIContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
     },
     [MAINNET_CHAIN_ID]: {
         name: "mainnet",
         blockConfirmations: BLOCK_CONFIRMATIONS,
-        usdtContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
-        daiContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
+        USDTContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
+        DAIContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
     },
 }
 
