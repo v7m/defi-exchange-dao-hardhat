@@ -222,7 +222,7 @@ chai.use(smock.matchers)
                         DAITokenMockContract.transferFrom
                     ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address, amount);
                     
-                    const totalBalance = await deFiExchangeContract.s_totalDaiBalance(deployer.address);
+                    const totalBalance = await deFiExchangeContract.getUserDAIBalance(deployer.address);
 
                     expect(totalBalance).to.eq(amount);
                 });
@@ -259,7 +259,7 @@ chai.use(smock.matchers)
                         USDTTokenMockContract.transferFrom
                     ).to.have.been.calledWith(deployer.address, deFiExchangeContract.address, amount);
 
-                    const totalBalance = await deFiExchangeContract.s_totalUsdtBalance(deployer.address);
+                    const totalBalance = await deFiExchangeContract.getUserUSDTBalance(deployer.address);
 
                     expect(totalBalance).to.eq(amount);
                 });
@@ -343,7 +343,7 @@ chai.use(smock.matchers)
                 });
 
                 it("withdraws amount", async () => {
-                    const userAmountBefore = await deFiExchangeContract.s_totalDaiBalance(deployer.address);
+                    const userAmountBefore = await deFiExchangeContract.getUserDAIBalance(deployer.address);
 
                     expect(userAmountBefore).to.eq(amount);
 
@@ -353,7 +353,7 @@ chai.use(smock.matchers)
                         DAITokenMockContract.transfer
                     ).to.have.been.calledWith(deployer.address, withdrawAmount);
 
-                    const userAmountAfter = await deFiExchangeContract.s_totalDaiBalance(deployer.address);
+                    const userAmountAfter = await deFiExchangeContract.getUserDAIBalance(deployer.address);
 
                     expect(userAmountAfter).to.eq(0);
                 });
@@ -396,7 +396,7 @@ chai.use(smock.matchers)
                 });
 
                 it("withdraws amount", async () => {
-                    const userAmountBefore = await deFiExchangeContract.s_totalUsdtBalance(deployer.address);
+                    const userAmountBefore = await deFiExchangeContract.getUserUSDTBalance(deployer.address);
 
                     expect(userAmountBefore).to.eq(amount);
 
@@ -406,7 +406,7 @@ chai.use(smock.matchers)
                         USDTTokenMockContract.transfer
                     ).to.have.been.calledWith(deployer.address, withdrawAmount);
 
-                    const userAmountAfter = await deFiExchangeContract.s_totalUsdtBalance(deployer.address);
+                    const userAmountAfter = await deFiExchangeContract.getUserUSDTBalance(deployer.address);
 
                     expect(userAmountAfter).to.eq(0);
                 });
