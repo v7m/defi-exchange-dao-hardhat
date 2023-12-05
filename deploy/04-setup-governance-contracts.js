@@ -4,8 +4,8 @@ const { ADDRESS_ZERO } = require("../helper-hardhat-config");
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { log } = deployments;
     const { deployer } = await getNamedAccounts();
-    const timeLock = await ethers.getContract("TimeLock", deployer)
-    const governor = await ethers.getContract("GovernorContract", deployer)
+    const timeLock = await ethers.getContract("TimeLock", deployer);
+    const governor = await ethers.getContract("GovernorContract", deployer);
 
     log("----------------------------------------------------------");
     log("Setting up governance contracts for roles...");
@@ -25,4 +25,4 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log("----------------------------------------------------------");
 }
 
-module.exports.tags = ["all", "governance", "setup"];
+module.exports.tags = ["all", "governance-setup", "GovernorContract-setup"];

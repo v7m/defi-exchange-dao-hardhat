@@ -1,5 +1,10 @@
-const { network } = require("hardhat");
-const { developmentChains, networkConfig, WITHDRAW_FEE_PERCENTAGE } = require("../helper-hardhat-config");
+const { network, ethers } = require("hardhat");
+const {
+    developmentChains,
+    networkConfig,
+    WITHDRAW_FEE_PERCENTAGE,
+    STAKING_TO_GOVERNANCE_PERCENTAGE,
+} = require("../helper-hardhat-config");
 const { verifyContract } = require("../utils/verify-contract");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
@@ -7,7 +12,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deployer } = await getNamedAccounts();
     const chainId = network.config.chainId;
     const waitBlockConfirmations = networkConfig[network.name]["blockConfirmations"] || 1;
-    let DAITokenMockContract, USDTTokenMockContract, daiContractAddress, usdtContractAddress;
+    let DAITokenMockContract, USDTTokenMockContract, governanceTokenContract, daiContractAddress, usdtContractAddress;
 
     if (developmentChains.includes(network.name)) {
         DAITokenMockContract = await ethers.getContract("DAITokenMock");
@@ -19,10 +24,14 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         usdtContractAddress = networkConfig[chainId]["usdtContractAddress"];
     }
 
+    governanceTokenContract = await ethers.getContract("GovernanceToken");
+
     const args = [
         daiContractAddress,
         usdtContractAddress,
+        governanceTokenContract.address,
         WITHDRAW_FEE_PERCENTAGE,
+        STAKING_TO_GOVERNANCE_PERCENTAGE,
     ];
 
     log("----------------------------------------------------------");

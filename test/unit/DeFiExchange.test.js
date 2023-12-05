@@ -1,6 +1,6 @@
 const chai = require("chai");
 const expect = chai.expect;
-const { network, ethers } = require("hardhat");
+const { network, deployments, ethers } = require("hardhat");
 const { smock } = require("@defi-wonderland/smock");
 const { developmentChains } = require("../../helper-hardhat-config");
 
@@ -10,35 +10,144 @@ chai.use(smock.matchers)
     ? describe.skip
     : describe("DeFiExchange Unit Tests", () => {
         let accounts, deployer, user, DAITokenMockContractFactory, USDTTokenMockContractFactory, 
-            daiTokenMockContract, usdtTokenMockContract, deFiExchangeContract, deFiExchangeContractFactory;
+            daiTokenMockContract, usdtTokenMockContract, deFiExchangeContract, deFiExchangeContractFactory,
+            governanceTokenContract, governanceTokenContractFactory;
 
         const withdrawFeePercentage = 1;
-        const tokenAmount = ethers.utils.parseUnits("100", 18);
+        const stakingToGovernancePercentage = 100;
+        const amount = ethers.utils.parseUnits("100", 18);
 
         beforeEach(async () => {
             accounts = await ethers.getSigners();
             deployer = accounts[0];
             user = accounts[1]
 
+            await deployments.fixture(["governance"]);
+
             DAITokenMockContractFactory = await ethers.getContractFactory("DAITokenMock");
             USDTTokenMockContractFactory = await ethers.getContractFactory("USDTTokenMock");
             daiTokenMockContract = await smock.fake(DAITokenMockContractFactory);
             usdtTokenMockContract = await smock.fake(USDTTokenMockContractFactory);
 
-            daiTokenMockContract.allowance.returns(tokenAmount);
-            usdtTokenMockContract.allowance.returns(tokenAmount);
+            daiTokenMockContract.allowance.returns(amount);
+            usdtTokenMockContract.allowance.returns(amount);
             daiTokenMockContract.transferFrom.returns(true);
             usdtTokenMockContract.transferFrom.returns(true);
             daiTokenMockContract.transfer.returns(true);
             usdtTokenMockContract.transfer.returns(true);
 
+            governanceTokenContractFactory = await ethers.getContractFactory("GovernanceToken");
+            governanceTokenContract = await smock.fake(governanceTokenContractFactory);
+
             deFiExchangeContractFactory = await ethers.getContractFactory("DeFiExchange");
             deFiExchangeContract = await deFiExchangeContractFactory.deploy(
                 daiTokenMockContract.address,
                 usdtTokenMockContract.address,
-                withdrawFeePercentage
+                governanceTokenContract.address,
+                withdrawFeePercentage,
+                stakingToGovernancePercentage
             );
             await deFiExchangeContract.deployed();
+
+            governanceTokenContract.initialize(deFiExchangeContract.address);
+        });
+
+        describe("stakeETHForGovernance", async () => {
+            beforeEach(async () => {
+                deFiExchangeContract = deFiExchangeContract.connect(user);
+            });
+
+            context("when user sent ETH amount", async () => {
+                const amount = ethers.utils.parseEther("100");
+
+                it("updates staking amount", async () => {
+                    await deFiExchangeContract.stakeETHForGovernance({ value: amount });
+                    const stakingAmountAfter = await deFiExchangeContract.s_totalEthStaking(user.address);
+
+                    expect(stakingAmountAfter).to.eq(amount);
+                });
+
+                it("mints governance tokens", async () => {
+                    await deFiExchangeContract.stakeETHForGovernance({ value: amount });
+                    const stakingAmountAfter = await deFiExchangeContract.s_totalEthStaking(user.address);
+                    const governanceTokenAmount = stakingAmountAfter.mul(stakingToGovernancePercentage).div(100);
+
+                    expect(
+                        governanceTokenContract.mint
+                    ).to.have.been.calledWith(user.address, governanceTokenAmount);
+                });
+
+                it("emits StakedETHForGovernance", async () => {
+                    expect(
+                        await deFiExchangeContract.stakeETHForGovernance({ value: amount })
+                    ).to.emit("StakedETHForGovernance");
+                });
+            });
+
+            context("when user sent 0 ETH amount", async () => {
+                const amount = ethers.utils.parseEther("0");
+
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.stakeETHForGovernance({ value: amount })
+                    ).to.be.revertedWith("DeFiExchange__NotEnoughETHForStaking");
+                });
+            });
+        });
+
+        describe("withdrawStakedETHForGovernance", async () => {
+            beforeEach(async () => {
+                deFiExchangeContract = deFiExchangeContract.connect(user);
+            });
+
+            context("when ETH amount staked", async () => {
+                const amount = ethers.utils.parseEther("100");
+
+                beforeEach(async () => {
+                    deFiExchangeContract.stakeETHForGovernance({ value: amount })
+                });
+
+                it("updates staking amount", async () => {
+                    await deFiExchangeContract.withdrawStakedETHForGovernance();
+                    const stakingAmountAfter = await deFiExchangeContract.s_totalEthStaking(user.address);
+
+                    expect(stakingAmountAfter).to.eq(0);
+                });
+
+                it("burns governance tokens", async () => {
+                    const stakingAmountBefore = await deFiExchangeContract.s_totalEthStaking(user.address);
+                    await deFiExchangeContract.withdrawStakedETHForGovernance();
+                    const governanceTokenAmount = stakingAmountBefore.mul(stakingToGovernancePercentage).div(100);
+
+                    expect(
+                        governanceTokenContract.burn
+                    ).to.have.been.calledWith(user.address, governanceTokenAmount);
+                });
+
+                it("emits WithdrawStakedETHForGovernance", async () => {
+                    expect(
+                        await deFiExchangeContract.withdrawStakedETHForGovernance()
+                    ).to.emit("WithdrawStakedETHForGovernance");
+                });
+            });
+
+            context("when no ETH amount staked", async () => {
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.withdrawStakedETHForGovernance()
+                    ).to.be.revertedWith("DeFiExchange__ETHIsNotStaked");
+                });
+            });
+        });
+
+        describe("calculateGovernanceTokensAmount", async () => {
+            const amount = ethers.utils.parseEther("100");
+            const governanceTokenAmount = amount.mul(stakingToGovernancePercentage).div(100);
+
+            it("returns correct governance tokens amount", async () => {
+                const calculatedAmount =  await deFiExchangeContract.calculateGovernanceTokensAmount(amount);
+                expect(calculatedAmount).to.eq(governanceTokenAmount);
+            });
         });
 
         describe("changeWithdrawFeePercentage", async () => {

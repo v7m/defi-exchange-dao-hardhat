@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./GovernanceToken.sol";
 
 error DeFiExchange__InsufficientDepositDAIBalance();
 error DeFiExchange__InsufficientWithdrawDAIBalance();
@@ -14,18 +15,25 @@ error DeFiExchange__InsufficientWithdrawUSDTBalance();
 error DeFiExchange__InsufficientWithdrawETHBalance();
 error DeFiExchange__WithdrawETHFail();
 error DeFiExchange__InvalidNewWithdrawFeePercentage();
+error DeFiExchange__ETHIsNotStaked();
+error DeFiExchange__NotEnoughETHForStaking();
+error DeFiExchange__WithdrawStakedETHFail();
 
 contract DeFiExchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
     uint8 public s_withdrawFeePercentage;
+    uint8 public s_stakingToGovernancePercentage;
+
     uint256 public s_totalEthFees = 0;
     uint256 public s_totalDaiFees = 0;
     uint256 public s_totalUsdtFees = 0;
 
     IERC20 public s_daiToken;
     IERC20 public s_usdtToken;
+    GovernanceToken public s_governanceToken;
 
+    mapping(address => uint256) public s_totalEthStaking;
     mapping(address => uint256) public s_totalEthBalance;
     mapping(address => uint256) public s_totalDaiBalance;
     mapping(address => uint256) public s_totalUsdtBalance;
@@ -37,15 +45,21 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     event USDTDeposited(address user, uint256 amount);
     event USDTWithdrawn(address user, uint256 amount);
     event WithdrawFeePercentageChanged(uint8 newWithdrawFeePercentage);
+    event StakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
+    event WithdrawStakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
 
     constructor(
         address daiTokenAddress,
         address usdtTokenAddress,
-        uint8 withdrawFeePercentage
+        address governanceTokenAddress,
+        uint8 withdrawFeePercentage,
+        uint8 stakingToGovernancePercentage
     ) {
         s_daiToken = IERC20(daiTokenAddress);
         s_usdtToken = IERC20(usdtTokenAddress);
+        s_governanceToken = GovernanceToken(governanceTokenAddress);
         s_withdrawFeePercentage = withdrawFeePercentage;
+        s_stakingToGovernancePercentage = stakingToGovernancePercentage;
     }
 
     function changeWithdrawFeePercentage(uint8 _withdrawFeePercentage) external onlyOwner {
@@ -55,6 +69,43 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_withdrawFeePercentage = _withdrawFeePercentage;
         emit WithdrawFeePercentageChanged(s_withdrawFeePercentage);
     }
+
+    // STAKE FUNCTIONS
+
+    function stakeETHForGovernance() external payable nonReentrant {
+        uint256 stakingAmount = msg.value;
+        if (stakingAmount == 0) {
+            revert DeFiExchange__NotEnoughETHForStaking();
+        }
+        uint256 governanceAmount = calculateGovernanceTokensAmount(stakingAmount);
+        s_totalEthStaking[msg.sender] += stakingAmount;
+        s_governanceToken.mint(msg.sender, governanceAmount);
+
+        emit StakedETHForGovernance(msg.sender, stakingAmount, governanceAmount);
+    }
+
+    function withdrawStakedETHForGovernance() external nonReentrant {
+        uint256 stakedAmount = s_totalEthStaking[msg.sender];
+        if (stakedAmount == 0) {
+            revert DeFiExchange__ETHIsNotStaked();
+        }
+        uint256 governanceAmount = calculateGovernanceTokensAmount(stakedAmount);
+        s_governanceToken.burn(msg.sender, governanceAmount);
+        s_totalEthStaking[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: stakedAmount}("");
+        if (!success) {
+            revert DeFiExchange__WithdrawStakedETHFail();
+        }
+        emit WithdrawStakedETHForGovernance(msg.sender, stakedAmount, governanceAmount);
+    }
+
+    function calculateGovernanceTokensAmount(uint256 ethAmount) public view returns (uint256) {
+        uint256 governanceAmount = (ethAmount * s_stakingToGovernancePercentage) / 100;
+
+        return governanceAmount;
+    }
+
+    // DEPOSIT FUNCTIONS
 
     function depositETH() external payable {
         s_totalEthBalance[msg.sender] = s_totalEthBalance[msg.sender] + msg.value;
@@ -80,6 +131,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_totalUsdtBalance[msg.sender] += _amount;
         emit USDTDeposited(msg.sender, _amount);
     }
+
+    // WITHDRAW FUNCTIONS
 
     function withdrawETH() external nonReentrant() {
         uint256 totalAmount = s_totalEthBalance[msg.sender];

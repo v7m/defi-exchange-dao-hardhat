@@ -1,4 +1,4 @@
-const { network, ethers } = require("hardhat");
+const { network, deployments, ethers } = require("hardhat");
 const { expect } = require("chai");
 const { 
     developmentChains,
@@ -14,7 +14,7 @@ const { moveTime } = require("../../utils/move-time");
 
 !developmentChains.includes(network.name)
     ? describe.skip
-    : describe("Governance Flow", async () => {
+    : describe("Governance Flow Integration Tests", async () => {
         let governorContractContract, deFiExchangeContract;
         const voteWay = 1;
         const reason = "I like it";
