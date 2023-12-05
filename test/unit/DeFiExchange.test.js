@@ -359,12 +359,12 @@ chai.use(smock.matchers)
                 });
 
                 it("withdraws fee", async () => {
-                    const feeAmountBefore = await deFiExchangeContract.s_totalDaiFees();
+                    const feeAmountBefore = await deFiExchangeContract.getTotalDAIFees();
 
                     expect(feeAmountBefore).to.eq(0);
 
                     await deFiExchangeContract.withdrawDAI();
-                    const feeAmountAfter = await deFiExchangeContract.s_totalDaiFees();
+                    const feeAmountAfter = await deFiExchangeContract.getTotalDAIFees();
 
                     expect(feeAmountAfter).to.eq(feeAmount);
                 });
@@ -412,12 +412,12 @@ chai.use(smock.matchers)
                 });
 
                 it("withdraws fee", async () => {
-                    const feeAmountBefore = await deFiExchangeContract.s_totalUsdtFees();
+                    const feeAmountBefore = await deFiExchangeContract.getTotalUSDTFees();
 
                     expect(feeAmountBefore).to.eq(0);
 
                     await deFiExchangeContract.withdrawUSDT();
-                    const feeAmountAfter = await deFiExchangeContract.s_totalUsdtFees();
+                    const feeAmountAfter = await deFiExchangeContract.getTotalUSDTFees();
 
                     expect(feeAmountAfter).to.eq(feeAmount);
                 });

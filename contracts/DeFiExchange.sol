@@ -22,6 +22,7 @@ error DeFiExchange__WithdrawStakedETHFail();
 
 contract DeFiExchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
+
     uint8 public s_withdrawFeePercentage;
     uint8 public s_stakingToGovernancePercentage;
 
@@ -29,10 +30,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     IERC20 public s_USDTToken;
     GovernanceToken public s_governanceToken;
 
-    uint256 public s_totalEthFees;
-    uint256 public s_totalDaiFees;
-    uint256 public s_totalUsdtFees;
-
+    uint256 public s_totalEthFees = 0;
+    mapping(address => uint256) public s_totalTokensFees;
     mapping(address => uint256) public s_totalEthStaking;
     mapping(address => uint256) public s_totalEthBalance;
     mapping(address => mapping(address => uint256)) public s_totalTokensBalance;
@@ -68,6 +67,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_withdrawFeePercentage = _withdrawFeePercentage;
         emit WithdrawFeePercentageChanged(s_withdrawFeePercentage);
     }
+
+    // STAKING FUNCTIONS
 
     function stakeETHForGovernance() external payable nonReentrant {
         uint256 stakingAmount = msg.value;
@@ -155,7 +156,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
-        s_totalDaiFees += fee;
+        s_totalTokensFees[address(s_DAIToken)] += fee;
         s_totalTokensBalance[msg.sender][address(s_DAIToken)] = 0;
         s_DAIToken.safeTransfer(msg.sender, withdrawAmount);
         emit DAIWithdrawn(msg.sender, withdrawAmount);
@@ -168,7 +169,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
-        s_totalUsdtFees += fee;
+        s_totalTokensFees[address(s_USDTToken)] += fee;
         s_totalTokensBalance[msg.sender][address(s_USDTToken)] = 0;
         s_USDTToken.safeTransfer(msg.sender, withdrawAmount);
         emit USDTWithdrawn(msg.sender, withdrawAmount);
@@ -196,5 +197,17 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
     function getUserUSDTBalance(address user) external view returns (uint256) {
         return s_totalTokensBalance[user][address(s_USDTToken)];
+    }
+
+    function getTotalETHFees() external view returns (uint256) {
+        return s_totalEthFees;
+    }
+
+    function getTotalDAIFees() external view returns (uint256) {
+        return s_totalTokensFees[address(s_DAIToken)];
+    }
+
+    function getTotalUSDTFees() external view returns (uint256) {
+        return s_totalTokensFees[address(s_USDTToken)];
     }
 }
