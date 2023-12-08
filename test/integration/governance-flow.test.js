@@ -16,14 +16,15 @@ const { moveTime } = require("../../utils/move-time");
     ? describe.skip
     : describe("Governance Flow Integration Tests", async () => {
         let governorContractContract, deFiExchangeContract;
+
         const voteWay = 1;
         const reason = "I like it";
-        
+
         beforeEach(async () => {
             await deployments.fixture(["all"]);
             governorContractContract = await ethers.getContract("GovernorContract");
             deFiExchangeContract = await ethers.getContract("DeFiExchange");
-        })
+        });
 
         context("when DeFiExchange contract called not through governance", async () => {
             it("can only be changed through governance", async () => {
@@ -31,7 +32,7 @@ const { moveTime } = require("../../utils/move-time");
                     deFiExchangeContract.changeWithdrawFeePercentage(55)
                 ).to.be.revertedWith("Ownable: caller is not the owner");
             });
-        })
+        });
 
         it("proposes, votes, queues, and then executes DeFiExchange function through governance", async () => {
             // Creating a proposal
@@ -52,7 +53,7 @@ const { moveTime } = require("../../utils/move-time");
             expect(proposalState.toString()).to.eq("0"); // 0: Pending
 
             await moveBlocks(VOTING_DELAY + 1);
-            
+
             // Voting
             const voteTx = await governorContractContract.castVoteWithReason(proposalId, voteWay, reason);
             await voteTx.wait(1);

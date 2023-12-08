@@ -6,8 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import "./GovernanceToken.sol";
-
 
 error DeFiExchange__InsufficientDepositDAIBalance();
 error DeFiExchange__InsufficientWithdrawDAIBalance();
@@ -19,16 +20,20 @@ error DeFiExchange__InvalidNewWithdrawFeePercentage();
 error DeFiExchange__ETHIsNotStaked();
 error DeFiExchange__NotEnoughETHForStaking();
 error DeFiExchange__WithdrawStakedETHFail();
+error DeFiExchange__InsufficientSwapTokensBalance(address token, address user, uint256 amount);
 
 contract DeFiExchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
+    using TransferHelper for address;
 
+    uint24 public s_uniswapPoolFee;
     uint8 public s_withdrawFeePercentage;
     uint8 public s_stakingToGovernancePercentage;
 
     IERC20 public s_DAIToken;
     IERC20 public s_USDTToken;
-    GovernanceToken public s_governanceToken;
+    ISwapRouter public immutable s_swapRouter;
+    GovernanceToken public immutable s_governanceToken;
 
     uint256 public s_totalEthFees = 0;
     mapping(address => uint256) public s_totalTokensFees;
@@ -50,12 +55,16 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         address DAITokenAddress,
         address USDTTokenAddress,
         address governanceTokenAddress,
+        address swapRouterAddress,
+        uint24 uniswapPoolFee,
         uint8 withdrawFeePercentage,
         uint8 stakingToGovernancePercentage
     ) {
         s_DAIToken = IERC20(DAITokenAddress);
         s_USDTToken = IERC20(USDTTokenAddress);
         s_governanceToken = GovernanceToken(governanceTokenAddress);
+        s_swapRouter = ISwapRouter(swapRouterAddress);
+        s_uniswapPoolFee = uniswapPoolFee;
         s_withdrawFeePercentage = withdrawFeePercentage;
         s_stakingToGovernancePercentage = stakingToGovernancePercentage;
     }
@@ -66,6 +75,43 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
         s_withdrawFeePercentage = _withdrawFeePercentage;
         emit WithdrawFeePercentageChanged(s_withdrawFeePercentage);
+    }
+
+    // SWAP TOKENS FUNCTIONS
+
+    function swapDaiToUsdt(uint256 amount) external {
+        performTokensSwap(address(s_DAIToken), address(s_USDTToken), amount);
+    }
+
+    function swapUsdtToDai(uint256 amount) external {
+        performTokensSwap(address(s_USDTToken), address(s_DAIToken), amount);
+    }
+
+    function performTokensSwap(
+        address tokenInAddress,
+        address tokenOutAddress,
+        uint256 amountIn
+    ) public nonReentrant {
+        if (s_totalTokensBalance[tokenInAddress][msg.sender] < amountIn) {
+            revert DeFiExchange__InsufficientSwapTokensBalance(tokenInAddress, msg.sender, amountIn);
+        }
+
+        ISwapRouter.ExactInputSingleParams memory params =
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: tokenInAddress,
+                tokenOut: tokenOutAddress,
+                fee: s_uniswapPoolFee,
+                recipient: msg.sender,
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        uint amountOut = s_swapRouter.exactInputSingle(params);
+
+        s_totalTokensBalance[tokenInAddress][msg.sender] -= amountIn;
+        s_totalTokensBalance[tokenOutAddress][msg.sender] += amountOut;
     }
 
     // STAKING FUNCTIONS
@@ -116,7 +162,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
 
         s_DAIToken.safeTransferFrom(msg.sender, address(this), _amount);
-        s_totalTokensBalance[msg.sender][address(s_DAIToken)] += _amount;
+        s_totalTokensBalance[address(s_DAIToken)][msg.sender] += _amount;
         emit DAIDeposited(msg.sender, _amount);
     }
 
@@ -126,7 +172,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
 
         s_USDTToken.safeTransferFrom(msg.sender, address(this), _amount);
-        s_totalTokensBalance[msg.sender][address(s_USDTToken)] += _amount;
+        s_totalTokensBalance[address(s_USDTToken)][msg.sender] += _amount;
         emit USDTDeposited(msg.sender, _amount);
     }
 
@@ -150,27 +196,27 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
     function withdrawDAI() external nonReentrant() {
 
-        uint256 totalAmount = s_totalTokensBalance[msg.sender][address(s_DAIToken)];
+        uint256 totalAmount = s_totalTokensBalance[address(s_DAIToken)][msg.sender];
         if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawDAIBalance();
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
         s_totalTokensFees[address(s_DAIToken)] += fee;
-        s_totalTokensBalance[msg.sender][address(s_DAIToken)] = 0;
+        s_totalTokensBalance[address(s_DAIToken)][msg.sender] = 0;
         s_DAIToken.safeTransfer(msg.sender, withdrawAmount);
         emit DAIWithdrawn(msg.sender, withdrawAmount);
     }
 
     function withdrawUSDT() external nonReentrant() {
-        uint256 totalAmount = s_totalTokensBalance[msg.sender][address(s_USDTToken)];
+        uint256 totalAmount = s_totalTokensBalance[address(s_USDTToken)][msg.sender];
         if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawUSDTBalance();
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
         s_totalTokensFees[address(s_USDTToken)] += fee;
-        s_totalTokensBalance[msg.sender][address(s_USDTToken)] = 0;
+        s_totalTokensBalance[address(s_USDTToken)][msg.sender] = 0;
         s_USDTToken.safeTransfer(msg.sender, withdrawAmount);
         emit USDTWithdrawn(msg.sender, withdrawAmount);
     }
@@ -192,11 +238,11 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     }
 
     function getUserDAIBalance(address user) external view returns (uint256) {
-        return s_totalTokensBalance[user][address(s_DAIToken)];
+        return s_totalTokensBalance[address(s_DAIToken)][user];
     }
 
     function getUserUSDTBalance(address user) external view returns (uint256) {
-        return s_totalTokensBalance[user][address(s_USDTToken)];
+        return s_totalTokensBalance[address(s_USDTToken)][user];
     }
 
     function getTotalETHFees() external view returns (uint256) {

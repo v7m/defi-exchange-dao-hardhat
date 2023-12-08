@@ -5,7 +5,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const { log } = deployments;
     const { deployer } = await getNamedAccounts();
     const governanceTokenContract = await ethers.getContract("GovernanceToken", deployer);
-    const deFiExchangeContract = await ethers.getContract("DeFiExchange");
+    const deFiExchangeContract = await ethers.getContractAt("DeFiExchange", deployer);
 
     log("----------------------------------------------------------");
     log("Setting up GovernanceToken contracts for roles...");

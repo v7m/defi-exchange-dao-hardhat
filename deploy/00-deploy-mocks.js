@@ -25,6 +25,15 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         });
 
         log("USDTTokenMock contract deployed!");
+        log("Deploying SwapRouterMock to local network...");
+
+        await deploy("SwapRouterMock", {
+            from: deployer,
+            log: true,
+            args: [],
+        });
+
+        log("SwapRouterMock contract deployed!");
         log("----------------------------------------------------------");
     }
 }

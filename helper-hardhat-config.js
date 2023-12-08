@@ -12,6 +12,8 @@ const WITHDRAW_FEE_PERCENTAGE = 1;
 const STAKING_TO_GOVERNANCE_PERCENTAGE = 100;
 const POLYGON_MAINNET_USDT_CONTRACT_ADDRESS = "0xc2132d05d31c914a87c6611c10748aeb04b58e8f";
 const POLYGON_MAINNET_DAI_CONTRACT_ADDRESS = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";
+const UNISWAP_POOL_FEE = 3000; // 0.3%
+const POLYGON_MAINNET_SWAP_ROUTER_CONTRACT_ADDRESS = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 
 // Governor Values
 const QUORUM_PERCENTAGE = 4; // 4% of voters to pass
@@ -39,20 +41,20 @@ const networkConfig = {
     [LOCALHOST_CHAIN_ID]: {
         name: "localhost",
         blockConfirmations: LOCAL_NETWORK_BLOCK_CONFIRMATIONS,
-        USDTContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
-        DAIContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
     },
     [MUMBAI_CHAIN_ID]: {
         name: "mumbai",
         blockConfirmations: BLOCK_CONFIRMATIONS,
         USDTContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
         DAIContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
+        swapRouterContractAddress: POLYGON_MAINNET_SWAP_ROUTER_CONTRACT_ADDRESS,
     },
     [MAINNET_CHAIN_ID]: {
         name: "mainnet",
         blockConfirmations: BLOCK_CONFIRMATIONS,
         USDTContractAddress: POLYGON_MAINNET_USDT_CONTRACT_ADDRESS,
         DAIContractAddress: POLYGON_MAINNET_DAI_CONTRACT_ADDRESS,
+        swapRouterContractAddress: POLYGON_MAINNET_SWAP_ROUTER_CONTRACT_ADDRESS,
     },
 }
 
@@ -64,6 +66,7 @@ module.exports = {
     networkConfig,
     developmentChains,
     proposalsFile,
+    UNISWAP_POOL_FEE,
     WITHDRAW_FEE_PERCENTAGE,
     STAKING_TO_GOVERNANCE_PERCENTAGE,
     MIN_DELAY,

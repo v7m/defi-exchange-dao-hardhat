@@ -11,23 +11,31 @@ chai.use(smock.matchers)
     : describe("DeFiExchange Unit Tests", () => {
         let accounts, deployer, user, DAITokenMockContractFactory, USDTTokenMockContractFactory, 
             DAITokenMockContract, USDTTokenMockContract, deFiExchangeContract, deFiExchangeContractFactory,
-            governanceTokenContract, governanceTokenContractFactory;
+            governanceTokenContract, governanceTokenContractFactory, swapRouterMockFactory, swapRouterMockContract,
+            timeLockContract;
 
         const withdrawFeePercentage = 1;
         const stakingToGovernancePercentage = 100;
+        const uniswapPoolFee = 3000;
         const amount = ethers.utils.parseUnits("100", 18);
+        const swapAmount = ethers.utils.parseUnits("50", 18);
 
         beforeEach(async () => {
             accounts = await ethers.getSigners();
             deployer = accounts[0];
             user = accounts[1]
 
-            await deployments.fixture(["governance"]);
+            await deployments.fixture(["mocks", "governance", "GovernorContract-setup"]);
 
             DAITokenMockContractFactory = await ethers.getContractFactory("DAITokenMock");
             USDTTokenMockContractFactory = await ethers.getContractFactory("USDTTokenMock");
+            swapRouterMockFactory = await ethers.getContractFactory("SwapRouterMock");
+            governanceTokenContractFactory = await ethers.getContractFactory("GovernanceToken");
+
             DAITokenMockContract = await smock.fake(DAITokenMockContractFactory);
             USDTTokenMockContract = await smock.fake(USDTTokenMockContractFactory);
+            swapRouterMockContract = await smock.fake(swapRouterMockFactory);
+            governanceTokenContract = await smock.fake(governanceTokenContractFactory);
 
             DAITokenMockContract.allowance.returns(amount);
             USDTTokenMockContract.allowance.returns(amount);
@@ -35,21 +43,118 @@ chai.use(smock.matchers)
             USDTTokenMockContract.transferFrom.returns(true);
             DAITokenMockContract.transfer.returns(true);
             USDTTokenMockContract.transfer.returns(true);
+            swapRouterMockContract.exactInputSingle.returns(swapAmount);
 
-            governanceTokenContractFactory = await ethers.getContractFactory("GovernanceToken");
-            governanceTokenContract = await smock.fake(governanceTokenContractFactory);
+            deFiExchangeContractFactory = await ethers.getContractFactory('DeFiExchange');
 
-            deFiExchangeContractFactory = await ethers.getContractFactory("DeFiExchange");
             deFiExchangeContract = await deFiExchangeContractFactory.deploy(
                 DAITokenMockContract.address,
                 USDTTokenMockContract.address,
                 governanceTokenContract.address,
+                swapRouterMockContract.address,
+                uniswapPoolFee,
                 withdrawFeePercentage,
                 stakingToGovernancePercentage
             );
-            await deFiExchangeContract.deployed();
 
-            governanceTokenContract.initialize(deFiExchangeContract.address);
+            await deFiExchangeContract.deployed();
+        });
+
+        describe("changeWithdrawFeePercentage", async () => {
+            context("when caller is contract owner", () => {
+                context("when new value is less then 100", () => {
+                    const withdrawFeePercentage = 99;
+
+                    it("updates s_withdrawFeePercentage", async () => {
+                        await deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage);
+                        const withdrawFee = await deFiExchangeContract.s_withdrawFeePercentage();
+
+                        expect(withdrawFee).to.eq(withdrawFeePercentage);
+                    });
+
+                    it("emits event WithdrawFeePercentageChanged", async () => {
+                        expect(
+                            await deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage)
+                        ).to.emit("WithdrawFeePercentageChanged");
+                    });
+                });
+
+                context("when fee is greater then 100", () => {
+                    const withdrawFeePercentage = 101;
+
+                    it("reverts transaction", async () => {
+                        await expect(
+                            deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage)
+                        ).to.be.revertedWith("DeFiExchange__InvalidNewWithdrawFeePercentage");
+                    });
+                });
+            });
+
+            context("when caller is not contract owner", () => {
+                const withdrawFeePercentage = 99;
+
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.connect(user).changeWithdrawFeePercentage(withdrawFeePercentage)
+                    ).to.be.revertedWith("Ownable: caller is not the owner");
+                });
+            });
+        });
+
+        describe("performTokensSwap", async () => {
+            beforeEach(async () => {
+                deFiExchangeContract = deFiExchangeContract.connect(user);
+            });
+
+            context("with sufficient user balance", () => {
+                beforeEach(async () => {
+                    await deFiExchangeContract.depositDAI(swapAmount);
+                });
+
+                it("calls swapRouterMockContract.exactInputSingle function", async () => {
+                    await deFiExchangeContract.performTokensSwap(
+                        DAITokenMockContract.address,
+                        USDTTokenMockContract.address,
+                        swapAmount
+                    );
+
+                    expect(
+                        swapRouterMockContract.exactInputSingle
+                    ).to.have.been.calledOnce;
+                });
+
+                it("updates tokens balance", async () => {
+                    const getUserDAIBalanceBefore = await deFiExchangeContract.getUserDAIBalance(user.address);
+                    const getUserUSDTBalanceBefore = await deFiExchangeContract.getUserUSDTBalance(user.address);
+
+                    expect(getUserDAIBalanceBefore).to.eq(swapAmount);
+                    expect(getUserUSDTBalanceBefore).to.eq(0);
+
+                    await deFiExchangeContract.performTokensSwap(
+                        DAITokenMockContract.address,
+                        USDTTokenMockContract.address,
+                        swapAmount
+                    );
+
+                    const getUserDAIBalanceAfter = await deFiExchangeContract.getUserDAIBalance(user.address);
+                    const getUserUSDTBalanceAfter = await deFiExchangeContract.getUserUSDTBalance(user.address);
+
+                    expect(getUserDAIBalanceAfter).to.eq(0);
+                    expect(getUserUSDTBalanceAfter).to.eq(swapAmount);
+                });
+            });
+
+            context("with insufficient user balance", () => {
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.performTokensSwap(
+                            DAITokenMockContract.address,
+                            USDTTokenMockContract.address,
+                            swapAmount
+                        )
+                    ).to.be.revertedWith("DeFiExchange__InsufficientSwapTokensBalance");
+                });
+            });
         });
 
         describe("stakeETHForGovernance", async () => {
@@ -147,47 +252,6 @@ chai.use(smock.matchers)
             it("returns correct governance tokens amount", async () => {
                 const calculatedAmount =  await deFiExchangeContract.calculateGovernanceTokensAmount(amount);
                 expect(calculatedAmount).to.eq(governanceTokenAmount);
-            });
-        });
-
-        describe("changeWithdrawFeePercentage", async () => {
-            context("when caller is contract owner", () => {
-                context("when new value is less then 100", () => {
-                    const withdrawFeePercentage = 99;
-
-                    it("updates s_withdrawFeePercentage", async () => {
-                        await deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage);
-                        const withdrawFee = await deFiExchangeContract.s_withdrawFeePercentage();
-
-                        expect(withdrawFee).to.eq(withdrawFeePercentage);
-                    });
-
-                    it("emits event WithdrawFeePercentageChanged", async () => {
-                        expect(
-                            await deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage)
-                        ).to.emit("WithdrawFeePercentageChanged");
-                    });
-                });
-
-                context("when fee is greater then 100", () => {
-                    const withdrawFeePercentage = 101;
-
-                    it("reverts transaction", async () => {
-                        await expect(
-                            deFiExchangeContract.changeWithdrawFeePercentage(withdrawFeePercentage)
-                        ).to.be.revertedWith("DeFiExchange__InvalidNewWithdrawFeePercentage");
-                    });
-                });
-            });
-
-            context("when caller is not contract owner", () => {
-                const withdrawFeePercentage = 99;
-
-                it("reverts transaction", async () => {
-                    await expect(
-                        deFiExchangeContract.connect(user).changeWithdrawFeePercentage(withdrawFeePercentage)
-                    ).to.be.revertedWith("Ownable: caller is not the owner");
-                });
             });
         });
 

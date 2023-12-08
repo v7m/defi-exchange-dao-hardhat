@@ -17,10 +17,11 @@ chai.use(smock.matchers)
             deployer = accounts[0];
             user = accounts[1]
 
-            await deployments.fixture(["all"]);
+            await deployments.fixture(["mocks", "governance", "main", "GovernorContract-setup"]);
 
             deFiExchangeContract = await ethers.getContract("DeFiExchange");
             governanceTokenContract = await ethers.getContract("GovernanceToken");
+            await governanceTokenContract.initialize(deFiExchangeContract.address);
             deFiExchangeContract = deFiExchangeContract.connect(user);
         });
 
