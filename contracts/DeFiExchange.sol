@@ -10,16 +10,14 @@ import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import "./GovernanceToken.sol";
 
-error DeFiExchange__InsufficientDepositDAIBalance();
-error DeFiExchange__InsufficientWithdrawDAIBalance();
-error DeFiExchange__InsufficientDepositUSDTBalance();
-error DeFiExchange__InsufficientWithdrawUSDTBalance();
-error DeFiExchange__InsufficientWithdrawETHBalance();
-error DeFiExchange__WithdrawETHFail();
-error DeFiExchange__InvalidNewWithdrawFeePercentage();
-error DeFiExchange__ETHIsNotStaked();
-error DeFiExchange__NotEnoughETHForStaking();
-error DeFiExchange__WithdrawStakedETHFail();
+error DeFiExchange__InsufficientDepositTokenBalance(address token, address user);
+error DeFiExchange__InsufficientWithdrawTokenBalance(address token, address user);
+error DeFiExchange__InsufficientWithdrawETHBalance(address user);
+error DeFiExchange__WithdrawETHFail(address user);
+error DeFiExchange__InvalidNewWithdrawFeePercentage(uint8 oldWithdrawFeePercentage, uint8 newWithdrawFeePercentage);
+error DeFiExchange__ETHIsNotStaked(address user);
+error DeFiExchange__NotEnoughETHForStaking(address user);
+error DeFiExchange__WithdrawStakedETHFail(address user);
 error DeFiExchange__InsufficientSwapTokensBalance(address token, address user, uint256 amount);
 
 contract DeFiExchange is ReentrancyGuard, Ownable {
@@ -43,10 +41,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
     event ETHDeposited(address user, uint256 amount);
     event ETHWithdrawn(address user, uint256 amount);
-    event DAIDeposited(address user, uint256 amount);
-    event DAIWithdrawn(address user, uint256 amount);
-    event USDTDeposited(address user, uint256 amount);
-    event USDTWithdrawn(address user, uint256 amount);
+    event TokenDeposited(address token, address user, uint256 amount);
+    event TokenWithdrawn(address token, address user, uint256 amount);
     event WithdrawFeePercentageChanged(uint8 newWithdrawFeePercentage);
     event StakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
     event WithdrawStakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
@@ -71,7 +67,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
     function changeWithdrawFeePercentage(uint8 _withdrawFeePercentage) external onlyOwner {
         if (_withdrawFeePercentage > 100) {
-            revert DeFiExchange__InvalidNewWithdrawFeePercentage();
+            revert DeFiExchange__InvalidNewWithdrawFeePercentage(s_withdrawFeePercentage, _withdrawFeePercentage);
         }
         s_withdrawFeePercentage = _withdrawFeePercentage;
         emit WithdrawFeePercentageChanged(s_withdrawFeePercentage);
@@ -119,7 +115,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     function stakeETHForGovernance() external payable nonReentrant {
         uint256 stakingAmount = msg.value;
         if (stakingAmount == 0) {
-            revert DeFiExchange__NotEnoughETHForStaking();
+            revert DeFiExchange__NotEnoughETHForStaking(msg.sender);
         }
         uint256 governanceAmount = calculateGovernanceTokensAmount(stakingAmount);
         s_totalEthStaking[msg.sender] += stakingAmount;
@@ -131,14 +127,14 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     function withdrawStakedETHForGovernance() external nonReentrant {
         uint256 stakedAmount = s_totalEthStaking[msg.sender];
         if (stakedAmount == 0) {
-            revert DeFiExchange__ETHIsNotStaked();
+            revert DeFiExchange__ETHIsNotStaked(msg.sender);
         }
         uint256 governanceAmount = calculateGovernanceTokensAmount(stakedAmount);
         s_governanceToken.burn(msg.sender, governanceAmount);
         s_totalEthStaking[msg.sender] = 0;
         (bool success, ) = payable(msg.sender).call{value: stakedAmount}("");
         if (!success) {
-            revert DeFiExchange__WithdrawStakedETHFail();
+            revert DeFiExchange__WithdrawStakedETHFail(msg.sender);
         }
         emit WithdrawStakedETHForGovernance(msg.sender, stakedAmount, governanceAmount);
     }
@@ -158,22 +154,22 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
     function depositDAI(uint256 _amount) external {
         if (s_DAIToken.allowance(msg.sender, address(this)) < _amount) {
-            revert DeFiExchange__InsufficientDepositDAIBalance();
+            revert DeFiExchange__InsufficientDepositTokenBalance(address(s_DAIToken), msg.sender);
         }
 
         s_DAIToken.safeTransferFrom(msg.sender, address(this), _amount);
         s_totalTokensBalance[address(s_DAIToken)][msg.sender] += _amount;
-        emit DAIDeposited(msg.sender, _amount);
+        emit TokenDeposited(address(s_DAIToken), msg.sender, _amount);
     }
 
     function depositUSDT(uint256 _amount) external {
         if (s_USDTToken.allowance(msg.sender, address(this)) < _amount) {
-            revert DeFiExchange__InsufficientDepositUSDTBalance();
+            revert DeFiExchange__InsufficientDepositTokenBalance(address(s_USDTToken), msg.sender);
         }
 
         s_USDTToken.safeTransferFrom(msg.sender, address(this), _amount);
         s_totalTokensBalance[address(s_USDTToken)][msg.sender] += _amount;
-        emit USDTDeposited(msg.sender, _amount);
+        emit TokenDeposited(address(s_DAIToken), msg.sender, _amount);
     }
 
     // WITHDRAW FUNCTIONS
@@ -181,7 +177,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     function withdrawETH() external nonReentrant() {
         uint256 totalAmount = s_totalEthBalance[msg.sender];
         if (totalAmount <= 0) {
-            revert DeFiExchange__InsufficientWithdrawETHBalance();
+            revert DeFiExchange__InsufficientWithdrawETHBalance(msg.sender);
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
@@ -189,36 +185,35 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_totalEthBalance[msg.sender] = 0;
         (bool success, ) = payable(msg.sender).call{value: withdrawAmount}("");
         if (!success) {
-            revert DeFiExchange__WithdrawETHFail();
+            revert DeFiExchange__WithdrawETHFail(msg.sender);
         }
         emit ETHWithdrawn(msg.sender, withdrawAmount);
     }
 
     function withdrawDAI() external nonReentrant() {
-
         uint256 totalAmount = s_totalTokensBalance[address(s_DAIToken)][msg.sender];
         if (totalAmount <= 0) {
-            revert DeFiExchange__InsufficientWithdrawDAIBalance();
+            revert DeFiExchange__InsufficientWithdrawTokenBalance(address(s_DAIToken), msg.sender);
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
         s_totalTokensFees[address(s_DAIToken)] += fee;
         s_totalTokensBalance[address(s_DAIToken)][msg.sender] = 0;
         s_DAIToken.safeTransfer(msg.sender, withdrawAmount);
-        emit DAIWithdrawn(msg.sender, withdrawAmount);
+        emit TokenWithdrawn(address(s_DAIToken), msg.sender, withdrawAmount);
     }
 
     function withdrawUSDT() external nonReentrant() {
         uint256 totalAmount = s_totalTokensBalance[address(s_USDTToken)][msg.sender];
         if (totalAmount <= 0) {
-            revert DeFiExchange__InsufficientWithdrawUSDTBalance();
+            revert DeFiExchange__InsufficientWithdrawTokenBalance(address(s_USDTToken), msg.sender);
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
         s_totalTokensFees[address(s_USDTToken)] += fee;
         s_totalTokensBalance[address(s_USDTToken)][msg.sender] = 0;
         s_USDTToken.safeTransfer(msg.sender, withdrawAmount);
-        emit USDTWithdrawn(msg.sender, withdrawAmount);
+        emit TokenWithdrawn(address(s_USDTToken), msg.sender, withdrawAmount);
     }
 
     function calculateWithdrawalFee(uint256 amount) internal view returns (uint256) {

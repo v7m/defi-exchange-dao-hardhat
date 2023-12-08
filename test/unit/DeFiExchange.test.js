@@ -265,10 +265,10 @@ chai.use(smock.matchers)
                 expect(totalBalance).to.eq(amount);
             });
 
-            it("emits event ETHDeposited", async () => {
+            it("emits event TokenDeposited", async () => {
                 expect(
                     await deFiExchangeContract.depositETH({ value: amount })
-                ).to.emit("ETHDeposited");
+                ).to.emit("TokenDeposited");
             });
         });
 
@@ -291,10 +291,10 @@ chai.use(smock.matchers)
                     expect(totalBalance).to.eq(amount);
                 });
 
-                it("emits event DAIDeposited", async () => {
+                it("emits event TokenDeposited", async () => {
                     expect(
                         await deFiExchangeContract.depositDAI(amount)
-                    ).to.emit("DAIDeposited");
+                    ).to.emit("TokenDeposited");
                 });
             });
 
@@ -304,7 +304,7 @@ chai.use(smock.matchers)
                 it("reverts transaction", async () => {
                     await expect(
                         deFiExchangeContract.depositDAI(amount)
-                    ).to.be.revertedWith("DeFiExchange__InsufficientDepositDAIBalance");
+                    ).to.be.revertedWith("DeFiExchange__InsufficientDepositTokenBalance");
                 });
             });
         });
@@ -328,10 +328,10 @@ chai.use(smock.matchers)
                     expect(totalBalance).to.eq(amount);
                 });
 
-                it("emits event USDTDeposited", async () => {
+                it("emits event TokenDeposited", async () => {
                     expect(
                         await deFiExchangeContract.depositUSDT(amount)
-                    ).to.emit("USDTDeposited");
+                    ).to.emit("TokenDeposited");
                 });
             });
 
@@ -341,7 +341,7 @@ chai.use(smock.matchers)
                 it("reverts transaction", async () => {
                     await expect(
                         deFiExchangeContract.depositUSDT(amount)
-                    ).to.be.revertedWith("DeFiExchange__InsufficientDepositUSDTBalance");
+                    ).to.be.revertedWith("DeFiExchange__InsufficientDepositTokenBalance");
                 });
             });
         });
@@ -433,10 +433,10 @@ chai.use(smock.matchers)
                     expect(feeAmountAfter).to.eq(feeAmount);
                 });
 
-                it("emits event DAIWithdrawn", async () => {
+                it("emits event TokenWithdrawn", async () => {
                     expect(
                         await deFiExchangeContract.withdrawDAI()
-                    ).to.emit("DAIWithdrawn");
+                    ).to.emit("TokenWithdrawn");
                 });
             });
 
@@ -444,7 +444,7 @@ chai.use(smock.matchers)
                 it("reverts transaction", async () => {
                     await expect(
                         deFiExchangeContract.withdrawDAI()
-                    ).to.be.revertedWith("DeFiExchange__InsufficientWithdrawDAIBalance");
+                    ).to.be.revertedWith("DeFiExchange__InsufficientWithdrawTokenBalance");
                 });
             });
         });
@@ -486,10 +486,10 @@ chai.use(smock.matchers)
                     expect(feeAmountAfter).to.eq(feeAmount);
                 });
 
-                it("emits event USDTWithdrawn", async () => {
+                it("emits event TokenWithdrawn", async () => {
                     expect(
                         await deFiExchangeContract.withdrawUSDT()
-                    ).to.emit("USDTWithdrawn");
+                    ).to.emit("TokenWithdrawn");
                 });
             });
 
@@ -497,7 +497,7 @@ chai.use(smock.matchers)
                 it("reverts transaction", async () => {
                     await expect(
                         deFiExchangeContract.withdrawUSDT()
-                    ).to.be.revertedWith("DeFiExchange__InsufficientWithdrawUSDTBalance");
+                    ).to.be.revertedWith("DeFiExchange__InsufficientWithdrawTokenBalance");
                 });
             });
         });
