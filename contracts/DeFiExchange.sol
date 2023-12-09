@@ -32,6 +32,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     uint24 public s_uniswapPoolFee;
     uint8 public s_withdrawFeePercentage;
     uint8 public s_stakingToGovernancePercentage;
+    address public s_aavePoolAddress;
+    uint256 public s_totalEthFees;
 
     IERC20 public s_DAIToken;
     IERC20 public s_USDTToken;
@@ -42,9 +44,6 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     IPool public s_aavePool;
     GovernanceToken public s_governanceToken;
 
-    address public s_aavePoolAddress;
-
-    uint256 public s_totalEthFees = 0;
     mapping(address => uint256) public s_totalTokensFees;
     mapping(address => uint256) public s_totalEthStaking;
     mapping(address => uint256) public s_totalEthBalance;
@@ -57,6 +56,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     event WithdrawFeePercentageChanged(uint8 newWithdrawFeePercentage);
     event StakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
     event WithdrawStakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
+    event UniswapTokensSwapPerformed(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
     event ETHDepositedToAave(address user, uint256 amount);
 
     constructor(
@@ -141,6 +141,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
         s_totalTokensBalance[tokenInAddress][msg.sender] -= amountIn;
         s_totalTokensBalance[tokenOutAddress][msg.sender] += amountOut;
+        emit UniswapTokensSwapPerformed(tokenInAddress, tokenOutAddress, amountIn, amountOut);
     }
 
     // STAKING FUNCTIONS

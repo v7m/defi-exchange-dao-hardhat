@@ -201,6 +201,16 @@ chai.use(smock.matchers)
                     expect(userDAIBalanceAfter).to.eq(0);
                     expect(userUSDTBalanceAfter).to.eq(swapAmount);
                 });
+
+                it("emits UniswapTokensSwapPerformed", async () => {
+                    expect(
+                        await deFiExchangeContract.performTokensSwap(
+                            DAITokenMockContract.address,
+                            USDTTokenMockContract.address,
+                            swapAmount
+                        )
+                    ).to.emit("UniswapTokensSwapPerformed");
+                });
             });
 
             context("with insufficient user balance", () => {
