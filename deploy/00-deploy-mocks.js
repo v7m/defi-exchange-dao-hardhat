@@ -6,34 +6,30 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deployer } = await getNamedAccounts();
 
     if (developmentChains.includes(network.name)) {
+        const mockContracts = [
+            "DAITokenMock",
+            "USDTTokenMock",
+            "WETHTokenMock",
+            "SwapRouterMock",
+            "WrappedTokenGatewayMock",
+            "PoolAddressesProviderMock",
+        ];
+
         log("----------------------------------------------------------");
-        log("Deploying DAITokenMock to local network...");
 
-        await deploy("DAITokenMock", {
-            from: deployer,
-            log: true,
-            args: [],
-        });
+        for (let i = 0; i < mockContracts.length; i++) {
+            const contractName = mockContracts[i];
+            log(`Deploying ${contractName} to local network...`);
 
-        log("DAITokenMock contract deployed!");
-        log("Deploying USDTTokenMock to local network...");
+            await deploy(contractName, {
+                from: deployer,
+                log: true,
+                args: [],
+            });
 
-        await deploy("USDTTokenMock", {
-            from: deployer,
-            log: true,
-            args: [],
-        });
+            log(`${contractName} contract deployed!`);
+        }
 
-        log("USDTTokenMock contract deployed!");
-        log("Deploying SwapRouterMock to local network...");
-
-        await deploy("SwapRouterMock", {
-            from: deployer,
-            log: true,
-            args: [],
-        });
-
-        log("SwapRouterMock contract deployed!");
         log("----------------------------------------------------------");
     }
 }

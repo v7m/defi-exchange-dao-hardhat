@@ -19,14 +19,23 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     if (developmentChains.includes(network.name)) {
         DAITokenMockContract = await ethers.getContract("DAITokenMock");
         USDTTokenMockContract = await ethers.getContract("USDTTokenMock");
+        WETHTokenMockContract = await ethers.getContract("WETHTokenMock");
         swapRouterMockContract = await ethers.getContract("SwapRouterMock");
+        aaveWrappedTokenGatewayMockContract = await ethers.getContract("WrappedTokenGatewayMock");
+        aavePoolAddressesProviderMockContract = await ethers.getContract("PoolAddressesProviderMock");
         DAIContractAddress = DAITokenMockContract.address;
         USDTContractAddress = USDTTokenMockContract.address;
+        WETHContractAddress = WETHTokenMockContract.address;
         swapRouterContractAddress = swapRouterMockContract.address;
+        aaveWrappedTokenGatewayContractAddress = aaveWrappedTokenGatewayMockContract.address;
+        aavePoolAddressesProviderContractAddress = aavePoolAddressesProviderMockContract.address;
     } else {
         DAIContractAddress = networkConfig[chainId]["DAIContractAddress"];
         USDTContractAddress = networkConfig[chainId]["USDTContractAddress"];
+        WETHContractAddress = networkConfig[chainId]["WETHContractAddress"];
         swapRouterContractAddress = networkConfig[chainId]["swapRouterContract"];
+        aaveWrappedTokenGatewayContractAddress = networkConfig[chainId]["aaveWrappedTokenGatewayContractAddress"];
+        aavePoolAddressesProviderContractAddress = networkConfig[chainId]["aavePoolAddressesProviderAddress"];
     }
 
     governanceTokenContract = await ethers.getContract("GovernanceToken");
@@ -34,7 +43,10 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const args = [
         DAIContractAddress,
         USDTContractAddress,
+        WETHContractAddress,
         governanceTokenContract.address,
+        aaveWrappedTokenGatewayContractAddress,
+        aavePoolAddressesProviderContractAddress,
         swapRouterContractAddress,
         UNISWAP_POOL_FEE,
         WITHDRAW_FEE_PERCENTAGE,

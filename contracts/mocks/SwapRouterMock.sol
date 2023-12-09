@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.8;
+pragma solidity ^0.8.10;
 
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
@@ -18,14 +18,20 @@ contract SwapRouterMock is ISwapRouter {
     ) external override {}
 
     function exactInput(
-        ExactInputParams calldata params
-    ) external payable override returns (uint256 amountOut) {}
+        ExactInputParams calldata /* params */
+    ) external payable override returns (uint256 amountOut) {
+        amountOut = 0;
+    }
 
     function exactOutputSingle(
-        ExactOutputSingleParams calldata params
-    ) external payable override returns (uint256 amountIn) {}
+        ExactOutputSingleParams calldata /* params */
+    ) external payable override returns (uint256 amountIn) {
+        amountIn = 0;
+    }
 
     function exactOutput(
-        ExactOutputParams calldata params
-    ) external payable override returns (uint256 amountIn) {}
+        ExactOutputParams calldata /* params */
+    ) external payable override returns (uint256 amountIn) {
+        amountIn = 0;
+    }
 }

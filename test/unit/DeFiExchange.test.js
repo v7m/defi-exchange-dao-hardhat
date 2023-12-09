@@ -11,14 +11,14 @@ chai.use(smock.matchers)
     : describe("DeFiExchange Unit Tests", () => {
         let accounts, deployer, user, DAITokenMockContractFactory, USDTTokenMockContractFactory, 
             DAITokenMockContract, USDTTokenMockContract, deFiExchangeContract, deFiExchangeContractFactory,
-            governanceTokenContract, governanceTokenContractFactory, swapRouterMockFactory, swapRouterMockContract,
-            timeLockContract;
+            governanceTokenContract, governanceTokenContractFactory, swapRouterMockFactory, swapRouterMockContract;
 
         const withdrawFeePercentage = 1;
         const stakingToGovernancePercentage = 100;
         const uniswapPoolFee = 3000;
         const amount = ethers.utils.parseUnits("100", 18);
         const swapAmount = ethers.utils.parseUnits("50", 18);
+        const amountEth = ethers.utils.parseEther("100");
 
         beforeEach(async () => {
             accounts = await ethers.getSigners();
@@ -29,13 +29,19 @@ chai.use(smock.matchers)
 
             DAITokenMockContractFactory = await ethers.getContractFactory("DAITokenMock");
             USDTTokenMockContractFactory = await ethers.getContractFactory("USDTTokenMock");
-            swapRouterMockFactory = await ethers.getContractFactory("SwapRouterMock");
+            // WETHTokenMockContract = await ethers.getContractFactory("WETHTokenMock");
             governanceTokenContractFactory = await ethers.getContractFactory("GovernanceToken");
+            aaveWrappedTokenGatewayMockFactory = await ethers.getContractFactory("WrappedTokenGatewayMock");
+            aavePoolAddressesProviderMockFactory = await ethers.getContractFactory("PoolAddressesProviderMock");
+            swapRouterMockFactory = await ethers.getContractFactory("SwapRouterMock");
 
             DAITokenMockContract = await smock.fake(DAITokenMockContractFactory);
             USDTTokenMockContract = await smock.fake(USDTTokenMockContractFactory);
-            swapRouterMockContract = await smock.fake(swapRouterMockFactory);
+            // WETHTokenMockContract = await smock.fake(WETHTokenMockContract);
             governanceTokenContract = await smock.fake(governanceTokenContractFactory);
+            aaveWrappedTokenGatewayMockContract = await smock.fake(aaveWrappedTokenGatewayMockFactory);
+            aavePoolAddressesProviderMockContract = await smock.fake(aavePoolAddressesProviderMockFactory);
+            swapRouterMockContract = await smock.fake(swapRouterMockFactory);
 
             DAITokenMockContract.allowance.returns(amount);
             USDTTokenMockContract.allowance.returns(amount);
@@ -45,12 +51,17 @@ chai.use(smock.matchers)
             USDTTokenMockContract.transfer.returns(true);
             swapRouterMockContract.exactInputSingle.returns(swapAmount);
 
+            WETHTokenMockContract = await ethers.getContract("WETHTokenMock");
+
             deFiExchangeContractFactory = await ethers.getContractFactory('DeFiExchange');
 
             deFiExchangeContract = await deFiExchangeContractFactory.deploy(
                 DAITokenMockContract.address,
                 USDTTokenMockContract.address,
+                WETHTokenMockContract.address,
                 governanceTokenContract.address,
+                aaveWrappedTokenGatewayMockContract.address,
+                aavePoolAddressesProviderMockContract.address,
                 swapRouterMockContract.address,
                 uniswapPoolFee,
                 withdrawFeePercentage,
@@ -101,6 +112,54 @@ chai.use(smock.matchers)
             });
         });
 
+        describe("depositETHToAave", async () => {
+            beforeEach(async () => {
+                deFiExchangeContract = deFiExchangeContract.connect(user);
+                await deFiExchangeContract.depositETH({ value: amountEth });
+            });
+
+            context("with enough ETH balance", () => {
+                it("calls aaveWrappedTokenGatewayMockContract.depositETH function", async () => {
+                    await deFiExchangeContract.depositETHToAave(amountEth);
+
+                    expect(
+                        aaveWrappedTokenGatewayMockContract.depositETH
+                    ).to.have.been.calledOnce;
+                });
+            });
+
+            it("updates ETH and WETH token balances", async () => {
+                const userETHBalanceBefore = await deFiExchangeContract.getUserETHBalance(user.address);
+                const userWETHBalanceBefore = await deFiExchangeContract.getUserWETHBalance(user.address);
+
+                expect(userETHBalanceBefore).to.eq(amountEth);
+                expect(userWETHBalanceBefore).to.eq(0);
+
+                await deFiExchangeContract.depositETHToAave(amountEth);
+                const userETHBalanceAfter = await deFiExchangeContract.getUserETHBalance(user.address);
+                const userWETHBalanceAfter = await deFiExchangeContract.getUserWETHBalance(user.address);
+
+                expect(userETHBalanceAfter).to.eq(0);
+                expect(userWETHBalanceAfter).to.eq(amountEth);
+            });
+
+            it("emits ETHDepositedToAave", async () => {
+                expect(
+                    await deFiExchangeContract.depositETHToAave(amountEth)
+                ).to.emit("ETHDepositedToAave");
+            });
+
+            context("without enough ETH balance", () => {
+                const amount = ethers.utils.parseEther("101");
+
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.depositETHToAave(amount)
+                    ).to.be.revertedWith("DeFiExchange__NotEnoughETHForDepositingToAave");
+                });
+            });
+        });
+
         describe("performTokensSwap", async () => {
             beforeEach(async () => {
                 deFiExchangeContract = deFiExchangeContract.connect(user);
@@ -123,12 +182,12 @@ chai.use(smock.matchers)
                     ).to.have.been.calledOnce;
                 });
 
-                it("updates tokens balance", async () => {
-                    const getUserDAIBalanceBefore = await deFiExchangeContract.getUserDAIBalance(user.address);
-                    const getUserUSDTBalanceBefore = await deFiExchangeContract.getUserUSDTBalance(user.address);
+                it("updates tokens balances", async () => {
+                    const userDAIBalanceBefore = await deFiExchangeContract.getUserDAIBalance(user.address);
+                    const userUSDTBalanceBefore = await deFiExchangeContract.getUserUSDTBalance(user.address);
 
-                    expect(getUserDAIBalanceBefore).to.eq(swapAmount);
-                    expect(getUserUSDTBalanceBefore).to.eq(0);
+                    expect(userDAIBalanceBefore).to.eq(swapAmount);
+                    expect(userUSDTBalanceBefore).to.eq(0);
 
                     await deFiExchangeContract.performTokensSwap(
                         DAITokenMockContract.address,
@@ -136,11 +195,11 @@ chai.use(smock.matchers)
                         swapAmount
                     );
 
-                    const getUserDAIBalanceAfter = await deFiExchangeContract.getUserDAIBalance(user.address);
-                    const getUserUSDTBalanceAfter = await deFiExchangeContract.getUserUSDTBalance(user.address);
+                    const userDAIBalanceAfter = await deFiExchangeContract.getUserDAIBalance(user.address);
+                    const userUSDTBalanceAfter = await deFiExchangeContract.getUserUSDTBalance(user.address);
 
-                    expect(getUserDAIBalanceAfter).to.eq(0);
-                    expect(getUserUSDTBalanceAfter).to.eq(swapAmount);
+                    expect(userDAIBalanceAfter).to.eq(0);
+                    expect(userUSDTBalanceAfter).to.eq(swapAmount);
                 });
             });
 
