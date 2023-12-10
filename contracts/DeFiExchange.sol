@@ -101,7 +101,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
         address onBehalfOf = address(this);
         s_totalEthBalance[msg.sender] -= amount;
-        s_totalTokensBalance[address(s_WETHToken)][msg.sender] += amount;
+        s_totalTokensBalance[msg.sender][address(s_WETHToken)] += amount;
         s_aaveWrappedTokenGateway.depositETH{ value: amount }(s_aavePoolAddress, onBehalfOf, 0);
         emit ETHDepositedToAave(msg.sender, amount);
     }
@@ -121,7 +121,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         address tokenOutAddress,
         uint256 amountIn
     ) public nonReentrant {
-        if (s_totalTokensBalance[tokenInAddress][msg.sender] < amountIn) {
+        if (s_totalTokensBalance[msg.sender][tokenInAddress] < amountIn) {
             revert DeFiExchange__InsufficientSwapTokensBalance(tokenInAddress, msg.sender, amountIn);
         }
 
@@ -139,8 +139,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
         uint amountOut = s_uniswapSwapRouter.exactInputSingle(params);
 
-        s_totalTokensBalance[tokenInAddress][msg.sender] -= amountIn;
-        s_totalTokensBalance[tokenOutAddress][msg.sender] += amountOut;
+        s_totalTokensBalance[msg.sender][tokenInAddress] -= amountIn;
+        s_totalTokensBalance[msg.sender][tokenOutAddress] += amountOut;
         emit UniswapTokensSwapPerformed(tokenInAddress, tokenOutAddress, amountIn, amountOut);
     }
 
@@ -192,7 +192,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
 
         s_DAIToken.safeTransferFrom(msg.sender, address(this), _amount);
-        s_totalTokensBalance[address(s_DAIToken)][msg.sender] += _amount;
+        s_totalTokensBalance[msg.sender][address(s_DAIToken)] += _amount;
         emit TokenDeposited(address(s_DAIToken), msg.sender, _amount);
     }
 
@@ -202,7 +202,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
 
         s_USDTToken.safeTransferFrom(msg.sender, address(this), _amount);
-        s_totalTokensBalance[address(s_USDTToken)][msg.sender] += _amount;
+        s_totalTokensBalance[msg.sender][address(s_USDTToken)] += _amount;
         emit TokenDeposited(address(s_DAIToken), msg.sender, _amount);
     }
 
@@ -225,27 +225,27 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     }
 
     function withdrawDAI() external nonReentrant() {
-        uint256 totalAmount = s_totalTokensBalance[address(s_DAIToken)][msg.sender];
+        uint256 totalAmount = s_totalTokensBalance[msg.sender][address(s_DAIToken)];
         if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawTokenBalance(address(s_DAIToken), msg.sender);
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
         s_totalTokensFees[address(s_DAIToken)] += fee;
-        s_totalTokensBalance[address(s_DAIToken)][msg.sender] = 0;
+        s_totalTokensBalance[msg.sender][address(s_DAIToken)] = 0;
         s_DAIToken.safeTransfer(msg.sender, withdrawAmount);
         emit TokenWithdrawn(address(s_DAIToken), msg.sender, withdrawAmount);
     }
 
     function withdrawUSDT() external nonReentrant() {
-        uint256 totalAmount = s_totalTokensBalance[address(s_USDTToken)][msg.sender];
+        uint256 totalAmount = s_totalTokensBalance[msg.sender][address(s_USDTToken)];
         if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawTokenBalance(address(s_USDTToken), msg.sender);
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
         s_totalTokensFees[address(s_USDTToken)] += fee;
-        s_totalTokensBalance[address(s_USDTToken)][msg.sender] = 0;
+        s_totalTokensBalance[msg.sender][address(s_USDTToken)] = 0;
         s_USDTToken.safeTransfer(msg.sender, withdrawAmount);
         emit TokenWithdrawn(address(s_USDTToken), msg.sender, withdrawAmount);
     }
@@ -267,14 +267,14 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     }
 
     function getUserDAIBalance(address user) external view returns (uint256) {
-        return s_totalTokensBalance[address(s_DAIToken)][user];
+        return s_totalTokensBalance[user][address(s_DAIToken)];
     }
 
     function getUserUSDTBalance(address user) external view returns (uint256) {
-        return s_totalTokensBalance[address(s_USDTToken)][user];
+        return s_totalTokensBalance[user][address(s_USDTToken)];
     }
     function getUserWETHBalance(address user) external view returns (uint256) {
-        return s_totalTokensBalance[address(s_WETHToken)][user];
+        return s_totalTokensBalance[user][address(s_WETHToken)];
     }
 
     function getTotalETHFees() external view returns (uint256) {
