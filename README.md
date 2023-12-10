@@ -18,6 +18,8 @@ This platform is designed to be a comprehensive DeFi solution, particularly focu
 
 ## Technical description
 
+<img src="readme-images/schema.png" alt="image" width="500" height="auto" style="display: block; margin-left: auto; margin-right: auto;">
+
 Deployed on the `Polygon` blockchain for its cost-efficiency, the DeFi Exchange DAO platform is crafted using Solidity and employs OpenZeppelin contracts for robust security and standardization, incorporating `ERC20` and `ERC721` standards for token operations. The system integrates with `Aave` and `Uniswap` for diverse DeFi functionalities. It features DAO governance for decentralized decision-making and an upgradable contract architecture, ensuring long-term adaptability and resilience. The platform's reliability is further reinforced through extensive unit and integration testing of all smart contracts.
 
 ### Built with
@@ -47,7 +49,7 @@ yarn
 
 # Usage
 
-## Deploy:
+## Deploy
 
 ```bash
 yarn hardhat deploy
