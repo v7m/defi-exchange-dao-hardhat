@@ -39,11 +39,13 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     }
 
     governanceTokenContract = await ethers.getContract("GovernanceToken");
+    liquidityPoolNFTContract = await ethers.getContract("LiquidityPoolNFT");
 
     const args = [
         DAIContractAddress,
         USDTContractAddress,
         WETHContractAddress,
+        liquidityPoolNFTContract.address,
         governanceTokenContract.address,
         aaveWrappedTokenGatewayContractAddress,
         aavePoolAddressesProviderContractAddress,

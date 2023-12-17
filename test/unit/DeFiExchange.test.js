@@ -16,20 +16,21 @@ chai.use(smock.matchers)
         const withdrawFeePercentage = 1;
         const stakingToGovernancePercentage = 100;
         const uniswapPoolFee = 3000;
+        const nftTokenId = 1;
         const amount = ethers.utils.parseUnits("100", 18);
         const swapAmount = ethers.utils.parseUnits("50", 18);
-        const amountEth = ethers.utils.parseEther("100");
+        const ethAmount = ethers.utils.parseEther("100");
 
         beforeEach(async () => {
             accounts = await ethers.getSigners();
             deployer = accounts[0];
-            user = accounts[1]
+            user = accounts[1];
 
             await deployments.fixture(["mocks", "governance", "GovernorContract-setup"]);
 
             DAITokenMockContractFactory = await ethers.getContractFactory("DAITokenMock");
             USDTTokenMockContractFactory = await ethers.getContractFactory("USDTTokenMock");
-            // WETHTokenMockContract = await ethers.getContractFactory("WETHTokenMock");
+            liquidityPoolNFTContractFactory = await ethers.getContractFactory("LiquidityPoolNFT");
             governanceTokenContractFactory = await ethers.getContractFactory("GovernanceToken");
             aaveWrappedTokenGatewayMockFactory = await ethers.getContractFactory("WrappedTokenGatewayMock");
             aavePoolAddressesProviderMockFactory = await ethers.getContractFactory("PoolAddressesProviderMock");
@@ -37,7 +38,7 @@ chai.use(smock.matchers)
 
             DAITokenMockContract = await smock.fake(DAITokenMockContractFactory);
             USDTTokenMockContract = await smock.fake(USDTTokenMockContractFactory);
-            // WETHTokenMockContract = await smock.fake(WETHTokenMockContract);
+            liquidityPoolNFTContract = await smock.fake(liquidityPoolNFTContractFactory);
             governanceTokenContract = await smock.fake(governanceTokenContractFactory);
             aaveWrappedTokenGatewayMockContract = await smock.fake(aaveWrappedTokenGatewayMockFactory);
             aavePoolAddressesProviderMockContract = await smock.fake(aavePoolAddressesProviderMockFactory);
@@ -50,6 +51,8 @@ chai.use(smock.matchers)
             DAITokenMockContract.transfer.returns(true);
             USDTTokenMockContract.transfer.returns(true);
             swapRouterMockContract.exactInputSingle.returns(swapAmount);
+            liquidityPoolNFTContract.mintNFT.returns(nftTokenId);
+            liquidityPoolNFTContract.ownerOf.returns(user.address);
 
             WETHTokenMockContract = await ethers.getContract("WETHTokenMock");
 
@@ -59,6 +62,7 @@ chai.use(smock.matchers)
                 DAITokenMockContract.address,
                 USDTTokenMockContract.address,
                 WETHTokenMockContract.address,
+                liquidityPoolNFTContract.address,
                 governanceTokenContract.address,
                 aaveWrappedTokenGatewayMockContract.address,
                 aavePoolAddressesProviderMockContract.address,
@@ -112,15 +116,260 @@ chai.use(smock.matchers)
             });
         });
 
+        describe("provideLiquidity", async () => {
+            beforeEach(async () => {
+                deFiExchangeContract = deFiExchangeContract.connect(user);
+            });
+
+            context("when amount of liquidity is invalid", () => {
+                const daiAmount = 0;
+                const usdtAmount = 0;
+                const ethAmount = 0;
+
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount})
+                    ).to.be.revertedWith("DeFiExchange__InvalidAmountForLiquidityProviding");
+                });
+            });
+
+            context("when amount of liquidity is valid", () => {
+                context("when not enough tokens on user balance", () => {
+                    context("when not enough DAI on user balance", () => {
+                        const usdtAmount = ethers.utils.parseUnits("100", 18);
+                        const daiAmount = ethers.utils.parseUnits("101", 18);
+
+                        it("reverts transaction", async () => {
+                            await expect(
+                                deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount})
+                            ).to.be.revertedWith("DeFiExchange__InsufficientLiquidityProvidingTokenBalance");
+                        });
+                    });
+
+                    context("when not enough USDT on user balance", () => {
+                        const usdtAmount = ethers.utils.parseUnits("101", 18);
+                        const daiAmount = ethers.utils.parseUnits("100", 18);
+
+                        it("reverts transaction", async () => {
+                            await expect(
+                                deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount})
+                            ).to.be.revertedWith("DeFiExchange__InsufficientLiquidityProvidingTokenBalance");
+                        });
+                    });
+                });
+
+                context("when enough tokens on user balance", () => {
+                    const usdtAmount = ethers.utils.parseUnits("100", 18);
+                    const daiAmount = ethers.utils.parseUnits("100", 18);
+
+                    it("calls allowance and transferFrom function on token contracts", async () => {
+                        await deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount});
+
+                        expect(
+                            DAITokenMockContract.allowance
+                        ).to.have.been.calledWith(user.address, deFiExchangeContract.address);
+                        expect(
+                            DAITokenMockContract.transferFrom
+                        ).to.have.been.calledWith(user.address, deFiExchangeContract.address, amount);
+                        expect(
+                            USDTTokenMockContract.allowance
+                        ).to.have.been.calledWith(user.address, deFiExchangeContract.address);
+                        expect(
+                            USDTTokenMockContract.transferFrom
+                        ).to.have.been.calledWith(user.address, deFiExchangeContract.address, amount);
+                    });
+
+                    it("updates liquidity pool amounts", async () => {
+                        const liquidityPoolETHAmountBefore = await deFiExchangeContract.getLiquidityPoolETHAmount();
+                        const liquidityPoolDAIAmountBefore = await deFiExchangeContract.getLiquidityPoolDAIAmount();
+                        const liquidityPoolUSDTAmountBefore = await deFiExchangeContract.getLiquidityPoolUSDTAmount();
+
+                        expect(liquidityPoolETHAmountBefore).to.eq(0);
+                        expect(liquidityPoolDAIAmountBefore).to.eq(0);
+                        expect(liquidityPoolUSDTAmountBefore).to.eq(0);
+
+                        await deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount});
+                        const liquidityPoolETHAmountAfter = await deFiExchangeContract.getLiquidityPoolETHAmount();
+                        const liquidityPoolDAIAmountAfter = await deFiExchangeContract.getLiquidityPoolDAIAmount();
+                        const liquidityPoolUSDTAmountAfter = await deFiExchangeContract.getLiquidityPoolUSDTAmount();
+
+                        expect(liquidityPoolETHAmountAfter).to.eq(ethAmount);
+                        expect(liquidityPoolDAIAmountAfter).to.eq(daiAmount);
+                        expect(liquidityPoolUSDTAmountAfter).to.eq(usdtAmount);
+                    });
+
+                    it("calls mintNFT function on liquidity pool NFT contract", async () => {
+                        await deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount});
+
+                        expect(
+                            liquidityPoolNFTContract.mintNFT
+                        ).to.have.been.calledWith(user.address, ethAmount, daiAmount, usdtAmount);
+                    });
+
+                    it("updates NFT user liquidity pool amounts", async () => {
+                        const NFTUserETHLiquidityPoolAmountBefore = await deFiExchangeContract.getNFTUserETHLiquidityPoolAmount(nftTokenId);
+                        const NFTUserDAILiquidityPoolAmountBefore = await deFiExchangeContract.getNFTUserDAILiquidityPoolAmount(nftTokenId);
+                        const NFTUserUSDTLiquidityPoolAmountBefore = await deFiExchangeContract.getNFTUserUSDTLiquidityPoolAmount(nftTokenId);
+
+                        expect(NFTUserETHLiquidityPoolAmountBefore).to.eq(0);
+                        expect(NFTUserDAILiquidityPoolAmountBefore).to.eq(0);
+                        expect(NFTUserUSDTLiquidityPoolAmountBefore).to.eq(0);
+
+                        await deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount});
+                        const NFTUserETHLiquidityPoolAmountAfter = await deFiExchangeContract.getNFTUserETHLiquidityPoolAmount(nftTokenId);
+                        const NFTUserDAILiquidityPoolAmountAfter = await deFiExchangeContract.getNFTUserDAILiquidityPoolAmount(nftTokenId);
+                        const NFTUserUSDTLiquidityPoolAmountAfter = await deFiExchangeContract.getNFTUserUSDTLiquidityPoolAmount(nftTokenId);
+
+                        expect(NFTUserETHLiquidityPoolAmountAfter).to.eq(ethAmount);
+                        expect(NFTUserDAILiquidityPoolAmountAfter).to.eq(daiAmount);
+                        expect(NFTUserUSDTLiquidityPoolAmountAfter).to.eq(usdtAmount);
+                    });
+
+                    it("emits LiquidityProvided event", async () => {
+                        expect(
+                            await deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount})
+                        ).to.emit("LiquidityProvided");
+                    });
+                });
+            });
+        });
+
+        describe("redeemLiquidity", async () => {
+            const usdtAmount = ethers.utils.parseUnits("100", 18);
+            const daiAmount = ethers.utils.parseUnits("100", 18);
+
+            beforeEach(async () => {
+                deFiExchangeContract = deFiExchangeContract.connect(user);
+                await deFiExchangeContract.provideLiquidity(usdtAmount, daiAmount, {value: ethAmount});
+            });
+
+            context("when user is not NFT owner", () => {
+                beforeEach(async () => {
+                    liquidityPoolNFTContract.ownerOf.returns(deployer.address);
+                });
+
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.redeemLiquidity(nftTokenId)
+                    ).to.be.revertedWith("DeFiExchange__SenderIsNotOwnerOfNFT");
+                });
+            });
+
+            context("when user is NFT owner", () => {
+                it("withdraws ETH amount", async () => {
+                    const userAmountBefore = await deFiExchangeContract.getNFTUserETHLiquidityPoolAmount(nftTokenId);
+                    const userBalanceBefore = await user.getBalance();
+                    const txResponse = await deFiExchangeContract.redeemLiquidity(nftTokenId);
+                    const transactionReceipt = await txResponse.wait(1);
+                    const { gasUsed, effectiveGasPrice } = transactionReceipt;
+                    const gasCost = gasUsed.mul(effectiveGasPrice);
+                    const userBalanceAfter = await user.getBalance();
+
+                    expect(
+                        userBalanceAfter.add(gasCost).toString()
+                    ).to.eq(userAmountBefore.add(userBalanceBefore).toString());
+                });
+
+                it("calls transfer function on token contracts", async () => {
+                    await deFiExchangeContract.redeemLiquidity(nftTokenId);
+
+                    expect(
+                        DAITokenMockContract.transfer
+                    ).to.have.been.calledWith(user.address, daiAmount);
+                    expect(
+                        USDTTokenMockContract.transfer
+                    ).to.have.been.calledWith(user.address, usdtAmount);
+                });
+
+                it("updates liquidity pool amounts", async () => {
+                    const liquidityPoolETHAmountBefore = await deFiExchangeContract.getLiquidityPoolETHAmount();
+                    const liquidityPoolDAIAmountBefore = await deFiExchangeContract.getLiquidityPoolDAIAmount();
+                    const liquidityPoolUSDTAmountBefore = await deFiExchangeContract.getLiquidityPoolUSDTAmount();
+
+                    expect(liquidityPoolETHAmountBefore).to.eq(ethAmount);
+                    expect(liquidityPoolDAIAmountBefore).to.eq(daiAmount);
+                    expect(liquidityPoolUSDTAmountBefore).to.eq(usdtAmount);
+
+                    await deFiExchangeContract.redeemLiquidity(nftTokenId);
+                    const liquidityPoolETHAmountAfter = await deFiExchangeContract.getLiquidityPoolETHAmount();
+                    const liquidityPoolDAIAmountAfter = await deFiExchangeContract.getLiquidityPoolDAIAmount();
+                    const liquidityPoolUSDTAmountAfter = await deFiExchangeContract.getLiquidityPoolUSDTAmount();
+
+                    expect(liquidityPoolETHAmountAfter).to.eq(0);
+                    expect(liquidityPoolDAIAmountAfter).to.eq(0);
+                    expect(liquidityPoolUSDTAmountAfter).to.eq(0);
+                });
+
+                it("calls burnNFT function on liquidity pool NFT contract", async () => {
+                    await deFiExchangeContract.redeemLiquidity(nftTokenId);
+
+                    expect(
+                        liquidityPoolNFTContract.burnNFT
+                    ).to.have.been.calledWith(user.address, nftTokenId);
+                });
+
+                it("updates NFT user liquidity pool amounts", async () => {
+                    const NFTUserETHLiquidityPoolAmountBefore = await deFiExchangeContract.getNFTUserETHLiquidityPoolAmount(nftTokenId);
+                    const NFTUserDAILiquidityPoolAmountBefore = await deFiExchangeContract.getNFTUserDAILiquidityPoolAmount(nftTokenId);
+                    const NFTUserUSDTLiquidityPoolAmountBefore = await deFiExchangeContract.getNFTUserUSDTLiquidityPoolAmount(nftTokenId);
+
+                    expect(NFTUserETHLiquidityPoolAmountBefore).to.eq(ethAmount);
+                    expect(NFTUserDAILiquidityPoolAmountBefore).to.eq(daiAmount);
+                    expect(NFTUserUSDTLiquidityPoolAmountBefore).to.eq(usdtAmount);
+
+                    await deFiExchangeContract.redeemLiquidity(nftTokenId);
+                    const NFTUserETHLiquidityPoolAmountAfter = await deFiExchangeContract.getNFTUserETHLiquidityPoolAmount(nftTokenId);
+                    const NFTUserDAILiquidityPoolAmountAfter = await deFiExchangeContract.getNFTUserDAILiquidityPoolAmount(nftTokenId);
+                    const NFTUserUSDTLiquidityPoolAmountAfter = await deFiExchangeContract.getNFTUserUSDTLiquidityPoolAmount(nftTokenId);
+
+                    expect(NFTUserETHLiquidityPoolAmountAfter).to.eq(0);
+                    expect(NFTUserDAILiquidityPoolAmountAfter).to.eq(0);
+                    expect(NFTUserUSDTLiquidityPoolAmountAfter).to.eq(0);
+                });
+
+                it("emits LiquidityRedeemed event", async () => {
+                    expect(
+                        await deFiExchangeContract.redeemLiquidity(nftTokenId)
+                    ).to.emit("LiquidityRedeemed");
+                });
+            });
+        });
+
+        describe("isOwnerOfNFT", async () => {
+            beforeEach(async () => {
+                deFiExchangeContract = deFiExchangeContract.connect(user);
+            });
+
+            context("when user is NFT owner", () => {
+                it("returns true", async () => {
+                    const isOwner = await deFiExchangeContract.isOwnerOfNFT(user.address, nftTokenId);
+
+                    expect(isOwner).to.eq(true);
+                });
+            });
+
+            context("when user is not NFT owner", () => {
+                beforeEach(async () => {
+                    liquidityPoolNFTContract.ownerOf.returns(deployer.address);
+                });
+
+                it("returns false", async () => {
+                    const isOwner = await deFiExchangeContract.isOwnerOfNFT(user.address, nftTokenId);
+
+                    expect(isOwner).to.eq(false);
+                });
+            });
+        });
+
         describe("depositETHToAave", async () => {
             beforeEach(async () => {
                 deFiExchangeContract = deFiExchangeContract.connect(user);
-                await deFiExchangeContract.depositETH({ value: amountEth });
+                await deFiExchangeContract.depositETH({ value: ethAmount });
             });
 
             context("with enough ETH balance", () => {
                 it("calls aaveWrappedTokenGatewayMockContract.depositETH function", async () => {
-                    await deFiExchangeContract.depositETHToAave(amountEth);
+                    await deFiExchangeContract.depositETHToAave(ethAmount);
 
                     expect(
                         aaveWrappedTokenGatewayMockContract.depositETH
@@ -132,20 +381,20 @@ chai.use(smock.matchers)
                 const userETHBalanceBefore = await deFiExchangeContract.getUserETHBalance(user.address);
                 const userWETHBalanceBefore = await deFiExchangeContract.getUserWETHBalance(user.address);
 
-                expect(userETHBalanceBefore).to.eq(amountEth);
+                expect(userETHBalanceBefore).to.eq(ethAmount);
                 expect(userWETHBalanceBefore).to.eq(0);
 
-                await deFiExchangeContract.depositETHToAave(amountEth);
+                await deFiExchangeContract.depositETHToAave(ethAmount);
                 const userETHBalanceAfter = await deFiExchangeContract.getUserETHBalance(user.address);
                 const userWETHBalanceAfter = await deFiExchangeContract.getUserWETHBalance(user.address);
 
                 expect(userETHBalanceAfter).to.eq(0);
-                expect(userWETHBalanceAfter).to.eq(amountEth);
+                expect(userWETHBalanceAfter).to.eq(ethAmount);
             });
 
             it("emits ETHDepositedToAave", async () => {
                 expect(
-                    await deFiExchangeContract.depositETHToAave(amountEth)
+                    await deFiExchangeContract.depositETHToAave(ethAmount)
                 ).to.emit("ETHDepositedToAave");
             });
 

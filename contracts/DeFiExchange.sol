@@ -13,17 +13,24 @@ import "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import "@aave/core-v3/contracts/interfaces/IPool.sol";
 import "@aave/core-v3/contracts/misc/interfaces/IWETH.sol";
 import "./GovernanceToken.sol";
+import "./LiquidityPoolNFT.sol";
 
-error DeFiExchange__InsufficientDepositTokenBalance(address token, address user);
-error DeFiExchange__InsufficientWithdrawTokenBalance(address token, address user);
-error DeFiExchange__InsufficientWithdrawETHBalance(address user);
-error DeFiExchange__WithdrawETHFail(address user);
+error DeFiExchange__InsufficientDepositTokenBalance(address token, address sender);
+error DeFiExchange__InsufficientWithdrawTokenBalance(address token, address sender);
+error DeFiExchange__InsufficientWithdrawETHBalance(address sender);
+error DeFiExchange__WithdrawETHFail(address sender);
 error DeFiExchange__InvalidNewWithdrawFeePercentage(uint8 oldWithdrawFeePercentage, uint8 newWithdrawFeePercentage);
-error DeFiExchange__ETHIsNotStaked(address user);
-error DeFiExchange__NotEnoughETHForStaking(address user);
-error DeFiExchange__WithdrawStakedETHFail(address user);
-error DeFiExchange__InsufficientSwapTokensBalance(address token, address user, uint256 amount);
-error DeFiExchange__NotEnoughETHForDepositingToAave(address user, uint256 amount);
+error DeFiExchange__ETHIsNotStaked(address sender);
+error DeFiExchange__NotEnoughETHForStaking(address sender);
+error DeFiExchange__WithdrawStakedETHFail(address sender);
+error DeFiExchange__InsufficientSwapTokensBalance(address token, address sender, uint256 amount);
+error DeFiExchange__NotEnoughETHForDepositingToAave(address sender, uint256 amount);
+error DeFiExchange__InvalidAmountForLiquidityProviding(address sender, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
+error DeFiExchange__InsufficientLiquidityProvidingTokenBalance(address token, address sender, uint256 amount);
+error DeFiExchange__InsufficientLiquidityProvidingETHBalance(address sender, uint256 amount);
+error DeFiExchange__SenderIsNotOwnerOfNFT(address sender, uint256 tokenId);
+error DeFiExchange__RedeemLiquidityETHFail(address sender, uint256 amount);
+
 
 contract DeFiExchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
@@ -34,6 +41,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     uint8 public s_stakingToGovernancePercentage;
     address public s_aavePoolAddress;
     uint256 public s_totalEthFees;
+    uint256 public s_liquidityPoolETHAmounts;
 
     IERC20 public s_DAIToken;
     IERC20 public s_USDTToken;
@@ -43,26 +51,36 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     IPoolAddressesProvider public s_aavePoolAddressesProvider;
     IPool public s_aavePool;
     GovernanceToken public s_governanceToken;
+    LiquidityPoolNFT public s_liquidityPoolNFT;
 
     mapping(address => uint256) public s_totalTokensFees;
     mapping(address => uint256) public s_totalEthStaking;
     mapping(address => uint256) public s_totalEthBalance;
     mapping(address => mapping(address => uint256)) public s_totalTokensBalance;
+    mapping(address => uint256) public s_liquidityPoolTokenAmounts;
+    // user address => NFT tokenId => token address => amount
+    mapping(address => mapping(uint256 => mapping(address => uint256))) public s_NFTUserTokenLiquidityPoolAmounts;
+    // user address => NFT tokenId => amount
+    mapping(address => mapping(uint256 => uint256)) public s_NFTUserETHLiquidityPoolAmounts;
 
-    event ETHDeposited(address user, uint256 amount);
-    event ETHWithdrawn(address user, uint256 amount);
-    event TokenDeposited(address token, address user, uint256 amount);
-    event TokenWithdrawn(address token, address user, uint256 amount);
+    event ETHDeposited(address sender, uint256 amount);
+    event ETHWithdrawn(address sender, uint256 amount);
+    event TokenDeposited(address token, address sender, uint256 amount);
+    event TokenWithdrawn(address token, address sender, uint256 amount);
     event WithdrawFeePercentageChanged(uint8 newWithdrawFeePercentage);
-    event StakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
-    event WithdrawStakedETHForGovernance(address user, uint256 stakingAmount, uint256 governanceAmount);
+    event StakedETHForGovernance(address sender, uint256 stakingAmount, uint256 governanceAmount);
+    event WithdrawStakedETHForGovernance(address sender, uint256 stakingAmount, uint256 governanceAmount);
     event UniswapTokensSwapPerformed(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
-    event ETHDepositedToAave(address user, uint256 amount);
+    event ETHDepositedToAave(address sender, uint256 amount);
+    event LiquidityProvided(address sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
+    event LiquidityRedeemed(address sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
+    event ETHLiquidityRedeemd(address sender, uint256 ethAmount);
 
     constructor(
         address DAITokenAddress,
         address USDTTokenAddress,
         address WETHTokenAddress,
+        address liquidityPoolNFTAddress,
         address governanceTokenAddress,
         address aaveWrappedTokenGatewayAddress,
         address aavePoolAddressesProviderAddress,
@@ -74,6 +92,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_DAIToken = IERC20(DAITokenAddress);
         s_USDTToken = IERC20(USDTTokenAddress);
         s_WETHToken = IWETH(WETHTokenAddress);
+        s_liquidityPoolNFT = LiquidityPoolNFT(liquidityPoolNFTAddress);
         s_governanceToken = GovernanceToken(governanceTokenAddress);
         s_aaveWrappedTokenGateway = IWrappedTokenGatewayV3(aaveWrappedTokenGatewayAddress);
         s_aavePoolAddressesProvider = IPoolAddressesProvider(aavePoolAddressesProviderAddress);
@@ -91,6 +110,74 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
         s_withdrawFeePercentage = _withdrawFeePercentage;
         emit WithdrawFeePercentageChanged(s_withdrawFeePercentage);
+    }
+
+    // LIQUIDITY POOL FUNCTIONS
+
+    function provideLiquidity(uint256 usdtAmount, uint256 daiAmount) external payable returns (uint256) {
+        uint256 ethAmount = msg.value;
+        if (ethAmount == 0 && usdtAmount == 0 && daiAmount == 0) {
+            revert DeFiExchange__InvalidAmountForLiquidityProviding(msg.sender, ethAmount, usdtAmount, daiAmount);
+        }
+        if (daiAmount > 0) {
+            if (s_DAIToken.allowance(msg.sender, address(this)) < daiAmount) {
+                revert DeFiExchange__InsufficientLiquidityProvidingTokenBalance(address(s_DAIToken), msg.sender, daiAmount);
+            }
+            s_DAIToken.safeTransferFrom(msg.sender, address(this), daiAmount);
+            s_liquidityPoolTokenAmounts[address(s_DAIToken)] += daiAmount;
+        }
+        if (usdtAmount > 0) {
+            if (s_USDTToken.allowance(msg.sender, address(this)) < usdtAmount) {
+                revert DeFiExchange__InsufficientLiquidityProvidingTokenBalance(address(s_USDTToken), msg.sender, usdtAmount);
+            }
+            s_USDTToken.safeTransferFrom(msg.sender, address(this), usdtAmount);
+            s_liquidityPoolTokenAmounts[address(s_USDTToken)] += usdtAmount;
+        }
+        if (ethAmount > 0) {
+            s_liquidityPoolETHAmounts += ethAmount;
+        }
+        uint256 liquidityPoolNFTTokenId = s_liquidityPoolNFT.mintNFT(msg.sender, ethAmount, daiAmount, usdtAmount);
+        s_NFTUserETHLiquidityPoolAmounts[msg.sender][liquidityPoolNFTTokenId] = ethAmount;
+        s_NFTUserTokenLiquidityPoolAmounts[msg.sender][liquidityPoolNFTTokenId][address(s_DAIToken)] = daiAmount;
+        s_NFTUserTokenLiquidityPoolAmounts[msg.sender][liquidityPoolNFTTokenId][address(s_USDTToken)] = usdtAmount;
+        emit LiquidityProvided(msg.sender, liquidityPoolNFTTokenId, ethAmount, usdtAmount, daiAmount);
+        return liquidityPoolNFTTokenId;
+    }
+
+    function redeemLiquidity(uint256 tokenId) external {
+        if (!isOwnerOfNFT(msg.sender, tokenId)) {
+            revert DeFiExchange__SenderIsNotOwnerOfNFT(msg.sender, tokenId);
+        }
+        uint256 ethAmount = s_NFTUserETHLiquidityPoolAmounts[msg.sender][tokenId];
+        uint256 daiAmount = s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_DAIToken)];
+        uint256 usdtAmount = s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_USDTToken)];
+        if (daiAmount > 0) {
+            s_DAIToken.safeTransfer(msg.sender, daiAmount);
+            s_liquidityPoolTokenAmounts[address(s_DAIToken)] -= daiAmount;
+            s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_DAIToken)] = 0;
+        }
+        if (usdtAmount > 0) {
+            s_USDTToken.safeTransfer(msg.sender, usdtAmount);
+            s_liquidityPoolTokenAmounts[address(s_USDTToken)] -= usdtAmount;
+            s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_USDTToken)] = 0;
+        }
+        if (ethAmount > 0) {
+            s_liquidityPoolETHAmounts -= ethAmount;
+            s_NFTUserETHLiquidityPoolAmounts[msg.sender][tokenId] = 0;
+            (bool success, ) = payable(msg.sender).call{value: ethAmount}("");
+            if (!success) {
+                revert DeFiExchange__RedeemLiquidityETHFail(msg.sender, ethAmount);
+            }
+            emit ETHLiquidityRedeemd(msg.sender, ethAmount);
+        }
+        s_liquidityPoolNFT.burnNFT(msg.sender, tokenId);
+        emit LiquidityRedeemed(msg.sender, tokenId, ethAmount, daiAmount, usdtAmount);
+    }
+
+
+    function isOwnerOfNFT(address user, uint256 tokenId) public view returns (bool) {
+        address owner = s_liquidityPoolNFT.ownerOf(tokenId);
+        return owner == user;
     }
 
     // AAVE FUNCTIONS
@@ -287,5 +374,29 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
     function getTotalUSDTFees() external view returns (uint256) {
         return s_totalTokensFees[address(s_USDTToken)];
+    }
+
+    function getLiquidityPoolETHAmount() external view returns (uint256) {
+        return s_liquidityPoolETHAmounts;
+    }
+
+    function getLiquidityPoolDAIAmount() external view returns (uint256) {
+        return s_liquidityPoolTokenAmounts[address(s_DAIToken)];
+    }
+
+    function getLiquidityPoolUSDTAmount() external view returns (uint256) {
+        return s_liquidityPoolTokenAmounts[address(s_USDTToken)];
+    }
+
+    function getNFTUserETHLiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
+        return s_NFTUserETHLiquidityPoolAmounts[msg.sender][nftTokenId];
+    }
+
+    function getNFTUserUSDTLiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
+        return s_NFTUserTokenLiquidityPoolAmounts[msg.sender][nftTokenId][address(s_USDTToken)];
+    }
+
+    function getNFTUserDAILiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
+        return s_NFTUserTokenLiquidityPoolAmounts[msg.sender][nftTokenId][address(s_DAIToken)];
     }
 }
