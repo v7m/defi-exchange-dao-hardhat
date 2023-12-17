@@ -23,12 +23,14 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         swapRouterMockContract = await ethers.getContract("SwapRouterMock");
         aaveWrappedTokenGatewayMockContract = await ethers.getContract("WrappedTokenGatewayMock");
         aavePoolAddressesProviderMockContract = await ethers.getContract("PoolAddressesProviderMock");
+        aaveOraclePoolContractAddress = await ethers.getContract("AaveOracleMock");
         DAIContractAddress = DAITokenMockContract.address;
         USDTContractAddress = USDTTokenMockContract.address;
         WETHContractAddress = WETHTokenMockContract.address;
         swapRouterContractAddress = swapRouterMockContract.address;
         aaveWrappedTokenGatewayContractAddress = aaveWrappedTokenGatewayMockContract.address;
         aavePoolAddressesProviderContractAddress = aavePoolAddressesProviderMockContract.address;
+        aaveOraclePoolContractAddress = aaveOraclePoolContractAddress.address;
     } else {
         DAIContractAddress = networkConfig[chainId]["DAIContractAddress"];
         USDTContractAddress = networkConfig[chainId]["USDTContractAddress"];
@@ -36,6 +38,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         swapRouterContractAddress = networkConfig[chainId]["swapRouterContract"];
         aaveWrappedTokenGatewayContractAddress = networkConfig[chainId]["aaveWrappedTokenGatewayContractAddress"];
         aavePoolAddressesProviderContractAddress = networkConfig[chainId]["aavePoolAddressesProviderAddress"];
+        aaveOraclePoolContractAddress = networkConfig[chainId]["aaveOracleAddress"];
     }
 
     governanceTokenContract = await ethers.getContract("GovernanceToken");
@@ -49,6 +52,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         governanceTokenContract.address,
         aaveWrappedTokenGatewayContractAddress,
         aavePoolAddressesProviderContractAddress,
+        aaveOraclePoolContractAddress,
         swapRouterContractAddress,
         UNISWAP_POOL_FEE,
         WITHDRAW_FEE_PERCENTAGE,

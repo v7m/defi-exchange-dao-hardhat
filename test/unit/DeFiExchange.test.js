@@ -34,6 +34,8 @@ chai.use(smock.matchers)
             governanceTokenContractFactory = await ethers.getContractFactory("GovernanceToken");
             aaveWrappedTokenGatewayMockFactory = await ethers.getContractFactory("WrappedTokenGatewayMock");
             aavePoolAddressesProviderMockFactory = await ethers.getContractFactory("PoolAddressesProviderMock");
+            aaveOracleContractFactory = await ethers.getContractFactory("AaveOracleMock");
+            aavePoolMockContractFactory = await ethers.getContractFactory("PoolMock");
             swapRouterMockFactory = await ethers.getContractFactory("SwapRouterMock");
 
             DAITokenMockContract = await smock.fake(DAITokenMockContractFactory);
@@ -42,6 +44,8 @@ chai.use(smock.matchers)
             governanceTokenContract = await smock.fake(governanceTokenContractFactory);
             aaveWrappedTokenGatewayMockContract = await smock.fake(aaveWrappedTokenGatewayMockFactory);
             aavePoolAddressesProviderMockContract = await smock.fake(aavePoolAddressesProviderMockFactory);
+            aaveOracleContract = await smock.fake(aaveOracleContractFactory);
+            aavePoolMockContract = await smock.fake(aavePoolMockContractFactory);
             swapRouterMockContract = await smock.fake(swapRouterMockFactory);
 
             DAITokenMockContract.allowance.returns(amount);
@@ -53,6 +57,9 @@ chai.use(smock.matchers)
             swapRouterMockContract.exactInputSingle.returns(swapAmount);
             liquidityPoolNFTContract.mintNFT.returns(nftTokenId);
             liquidityPoolNFTContract.ownerOf.returns(user.address);
+            aaveOracleContract.getAssetPrice.returns(1);
+            aavePoolAddressesProviderMockContract.getPool.returns(aavePoolMockContract.address);
+            aavePoolMockContract.borrow.returns();
 
             WETHTokenMockContract = await ethers.getContract("WETHTokenMock");
 
@@ -66,6 +73,7 @@ chai.use(smock.matchers)
                 governanceTokenContract.address,
                 aaveWrappedTokenGatewayMockContract.address,
                 aavePoolAddressesProviderMockContract.address,
+                aaveOracleContract.address,
                 swapRouterMockContract.address,
                 uniswapPoolFee,
                 withdrawFeePercentage,
@@ -378,18 +386,29 @@ chai.use(smock.matchers)
             });
 
             it("updates ETH and WETH token balances", async () => {
-                const userETHBalanceBefore = await deFiExchangeContract.getUserETHBalance(user.address);
-                const userWETHBalanceBefore = await deFiExchangeContract.getUserWETHBalance(user.address);
+                const userETHBalanceBefore = await deFiExchangeContract.getUserETHBalance();
+                const userWETHBalanceBefore = await deFiExchangeContract.getUserWETHBalance();
 
                 expect(userETHBalanceBefore).to.eq(ethAmount);
                 expect(userWETHBalanceBefore).to.eq(0);
 
                 await deFiExchangeContract.depositETHToAave(ethAmount);
-                const userETHBalanceAfter = await deFiExchangeContract.getUserETHBalance(user.address);
-                const userWETHBalanceAfter = await deFiExchangeContract.getUserWETHBalance(user.address);
+                const userETHBalanceAfter = await deFiExchangeContract.getUserETHBalance();
+                const userWETHBalanceAfter = await deFiExchangeContract.getUserWETHBalance();
 
                 expect(userETHBalanceAfter).to.eq(0);
                 expect(userWETHBalanceAfter).to.eq(ethAmount);
+            });
+
+            it("updates user deposited ETH balance", async () => {
+                const userDepositedETHBefore = await deFiExchangeContract.getUserTotalDepositedETHtoAave();
+
+                expect(userDepositedETHBefore).to.equal(0);
+
+                await deFiExchangeContract.depositETHToAave(ethAmount);
+                const userDepositedETHAfter = await deFiExchangeContract.getUserTotalDepositedETHtoAave();
+
+                expect(userDepositedETHAfter).to.equal(ethAmount);
             });
 
             it("emits ETHDepositedToAave", async () => {
@@ -405,6 +424,62 @@ chai.use(smock.matchers)
                     await expect(
                         deFiExchangeContract.depositETHToAave(amount)
                     ).to.be.revertedWith("DeFiExchange__NotEnoughETHForDepositingToAave");
+                });
+            });
+        });
+
+        describe("borrowDAIFromAave", async () => {
+            beforeEach(async () => {
+                deFiExchangeContract = deFiExchangeContract.connect(user);
+                await deFiExchangeContract.depositETH({ value: ethAmount });
+            });
+
+            context("with sufficient deposited ETH as collateral", async () => {
+                const expectedDAIAmount = ethers.utils.parseUnits("80", 18);
+
+                beforeEach(async () => {
+                    await deFiExchangeContract.depositETHToAave(ethAmount);
+                });
+
+                it("updates user DAI balance", async () => {
+                    const daiBalanceBefore = await deFiExchangeContract.getUserDAIBalance();
+
+                    expect(daiBalanceBefore).to.equal(0);
+
+                    await deFiExchangeContract.borrowDAIFromAave();
+                    const daiBalance = await deFiExchangeContract.getUserDAIBalance();
+
+                    expect(daiBalance).to.equal(expectedDAIAmount);
+                });
+
+                it("calls getAssetPrice function on Aave Price Oracle contract", async () => {
+                    await deFiExchangeContract.borrowDAIFromAave();
+
+                    expect(
+                        aaveOracleContract.getAssetPrice
+                    ).to.have.been.calledWith(DAITokenMockContract.address);
+                });
+
+                it("calls borrow function on Aave Pool contract", async () => {
+                    await deFiExchangeContract.borrowDAIFromAave();
+
+                    expect(
+                        aavePoolMockContract.borrow
+                    ).to.have.been.calledWith(DAITokenMockContract.address, expectedDAIAmount, 2, 0, deFiExchangeContract.address);
+                });
+
+                it("emits BorrowedDAIFromAave", async () => {
+                    expect(
+                        await deFiExchangeContract.borrowDAIFromAave()
+                    ).to.emit("BorrowedDAIFromAave");
+                });
+            });
+
+            context("without sufficient deposited ETH as collateral", async () => {
+                it("reverts transaction", async () => {
+                    await expect(
+                        deFiExchangeContract.borrowDAIFromAave()
+                    ).to.be.revertedWith("DeFiExchange__InsufficientDepositedToAaveETHBalance");
                 });
             });
         });
@@ -432,8 +507,8 @@ chai.use(smock.matchers)
                 });
 
                 it("updates tokens balances", async () => {
-                    const userDAIBalanceBefore = await deFiExchangeContract.getUserDAIBalance(user.address);
-                    const userUSDTBalanceBefore = await deFiExchangeContract.getUserUSDTBalance(user.address);
+                    const userDAIBalanceBefore = await deFiExchangeContract.getUserDAIBalance();
+                    const userUSDTBalanceBefore = await deFiExchangeContract.getUserUSDTBalance();
 
                     expect(userDAIBalanceBefore).to.eq(swapAmount);
                     expect(userUSDTBalanceBefore).to.eq(0);
@@ -444,8 +519,8 @@ chai.use(smock.matchers)
                         swapAmount
                     );
 
-                    const userDAIBalanceAfter = await deFiExchangeContract.getUserDAIBalance(user.address);
-                    const userUSDTBalanceAfter = await deFiExchangeContract.getUserUSDTBalance(user.address);
+                    const userDAIBalanceAfter = await deFiExchangeContract.getUserDAIBalance();
+                    const userUSDTBalanceAfter = await deFiExchangeContract.getUserUSDTBalance();
 
                     expect(userDAIBalanceAfter).to.eq(0);
                     expect(userUSDTBalanceAfter).to.eq(swapAmount);
@@ -612,7 +687,7 @@ chai.use(smock.matchers)
                         DAITokenMockContract.transferFrom
                     ).to.have.been.calledWith(user.address, deFiExchangeContract.address, amount);
                     
-                    const totalBalance = await deFiExchangeContract.getUserDAIBalance(user.address);
+                    const totalBalance = await deFiExchangeContract.getUserDAIBalance();
 
                     expect(totalBalance).to.eq(amount);
                 });
@@ -653,7 +728,7 @@ chai.use(smock.matchers)
                         USDTTokenMockContract.transferFrom
                     ).to.have.been.calledWith(user.address, deFiExchangeContract.address, amount);
 
-                    const totalBalance = await deFiExchangeContract.getUserUSDTBalance(user.address);
+                    const totalBalance = await deFiExchangeContract.getUserUSDTBalance();
 
                     expect(totalBalance).to.eq(amount);
                 });
@@ -745,7 +820,7 @@ chai.use(smock.matchers)
                 });
 
                 it("withdraws amount", async () => {
-                    const userAmountBefore = await deFiExchangeContract.getUserDAIBalance(user.address);
+                    const userAmountBefore = await deFiExchangeContract.getUserDAIBalance();
 
                     expect(userAmountBefore).to.eq(amount);
 
@@ -755,7 +830,7 @@ chai.use(smock.matchers)
                         DAITokenMockContract.transfer
                     ).to.have.been.calledWith(user.address, withdrawAmount);
 
-                    const userAmountAfter = await deFiExchangeContract.getUserDAIBalance(user.address);
+                    const userAmountAfter = await deFiExchangeContract.getUserDAIBalance();
 
                     expect(userAmountAfter).to.eq(0);
                 });
@@ -802,7 +877,7 @@ chai.use(smock.matchers)
                 });
 
                 it("withdraws amount", async () => {
-                    const userAmountBefore = await deFiExchangeContract.getUserUSDTBalance(user.address);
+                    const userAmountBefore = await deFiExchangeContract.getUserUSDTBalance();
 
                     expect(userAmountBefore).to.eq(amount);
 
@@ -812,7 +887,7 @@ chai.use(smock.matchers)
                         USDTTokenMockContract.transfer
                     ).to.have.been.calledWith(user.address, withdrawAmount);
 
-                    const userAmountAfter = await deFiExchangeContract.getUserUSDTBalance(user.address);
+                    const userAmountAfter = await deFiExchangeContract.getUserUSDTBalance();
 
                     expect(userAmountAfter).to.eq(0);
                 });

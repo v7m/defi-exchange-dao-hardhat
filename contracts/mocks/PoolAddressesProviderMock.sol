@@ -4,7 +4,6 @@ pragma solidity ^0.8.10;
 
 import "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 
-
 contract PoolAddressesProviderMock is IPoolAddressesProvider {
     function getMarketId() external pure override returns (string memory) {
         return "MockMarketId";

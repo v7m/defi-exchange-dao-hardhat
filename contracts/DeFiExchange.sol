@@ -11,6 +11,7 @@ import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import "@aave/periphery-v3/contracts/misc/interfaces/IWrappedTokenGatewayV3.sol";
 import "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import "@aave/core-v3/contracts/interfaces/IPool.sol";
+import "@aave/core-v3/contracts/interfaces/IAaveOracle.sol";
 import "@aave/core-v3/contracts/misc/interfaces/IWETH.sol";
 import "./GovernanceToken.sol";
 import "./LiquidityPoolNFT.sol";
@@ -25,6 +26,7 @@ error DeFiExchange__NotEnoughETHForStaking(address sender);
 error DeFiExchange__WithdrawStakedETHFail(address sender);
 error DeFiExchange__InsufficientSwapTokensBalance(address token, address sender, uint256 amount);
 error DeFiExchange__NotEnoughETHForDepositingToAave(address sender, uint256 amount);
+error DeFiExchange__InsufficientDepositedToAaveETHBalance(address sender);
 error DeFiExchange__InvalidAmountForLiquidityProviding(address sender, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
 error DeFiExchange__InsufficientLiquidityProvidingTokenBalance(address token, address sender, uint256 amount);
 error DeFiExchange__InsufficientLiquidityProvidingETHBalance(address sender, uint256 amount);
@@ -36,12 +38,17 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
     using TransferHelper for address;
 
+    uint8 AAVE_LTV = 80; // The maximum Loan To Value (LTV) ratio for the deposited asset/ETH = 0.8
+    uint8 AAVE_REFERAL_CODE = 0; // referralCode 0 is like none
+    uint8 AAVE_VARIABLE_RATE = 2; // 1 is stable rate, 2 is variable rate
+
     uint24 public s_uniswapPoolFee;
     uint8 public s_withdrawFeePercentage;
     uint8 public s_stakingToGovernancePercentage;
     address public s_aavePoolAddress;
     uint256 public s_totalEthFees;
     uint256 public s_liquidityPoolETHAmounts;
+    uint256 public s_daiEthPrice;
 
     IERC20 public s_DAIToken;
     IERC20 public s_USDTToken;
@@ -50,6 +57,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     IWrappedTokenGatewayV3 public s_aaveWrappedTokenGateway;
     IPoolAddressesProvider public s_aavePoolAddressesProvider;
     IPool public s_aavePool;
+    IAaveOracle public s_aaveOracle;
     GovernanceToken public s_governanceToken;
     LiquidityPoolNFT public s_liquidityPoolNFT;
 
@@ -57,6 +65,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     mapping(address => uint256) public s_totalEthStaking;
     mapping(address => uint256) public s_totalEthBalance;
     mapping(address => mapping(address => uint256)) public s_totalTokensBalance;
+    mapping(address => uint256) public s_totalEthDepositedToAave;
     mapping(address => uint256) public s_liquidityPoolTokenAmounts;
     // user address => NFT tokenId => token address => amount
     mapping(address => mapping(uint256 => mapping(address => uint256))) public s_NFTUserTokenLiquidityPoolAmounts;
@@ -72,6 +81,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     event WithdrawStakedETHForGovernance(address sender, uint256 stakingAmount, uint256 governanceAmount);
     event UniswapTokensSwapPerformed(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
     event ETHDepositedToAave(address sender, uint256 amount);
+    event BorrowedDAIFromAave(address sender, uint256 priceDAI, uint256 amount);
     event LiquidityProvided(address sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
     event LiquidityRedeemed(address sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
     event ETHLiquidityRedeemd(address sender, uint256 ethAmount);
@@ -84,6 +94,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         address governanceTokenAddress,
         address aaveWrappedTokenGatewayAddress,
         address aavePoolAddressesProviderAddress,
+        address aaveOracleAddress,
         address uniswapSwapRouterAddress,
         uint24 uniswapPoolFee,
         uint8 withdrawFeePercentage,
@@ -98,6 +109,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_aavePoolAddressesProvider = IPoolAddressesProvider(aavePoolAddressesProviderAddress);
         s_aavePoolAddress = s_aavePoolAddressesProvider.getPool();
         s_aavePool = IPool(s_aavePoolAddress);
+        s_aaveOracle = IAaveOracle(aaveOracleAddress);
         s_uniswapSwapRouter = ISwapRouter(uniswapSwapRouterAddress);
         s_uniswapPoolFee = uniswapPoolFee;
         s_withdrawFeePercentage = withdrawFeePercentage;
@@ -189,8 +201,22 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         address onBehalfOf = address(this);
         s_totalEthBalance[msg.sender] -= amount;
         s_totalTokensBalance[msg.sender][address(s_WETHToken)] += amount;
+        s_totalEthDepositedToAave[msg.sender] += amount;
         s_aaveWrappedTokenGateway.depositETH{ value: amount }(s_aavePoolAddress, onBehalfOf, 0);
         emit ETHDepositedToAave(msg.sender, amount);
+    }
+
+    function borrowDAIFromAave() external nonReentrant {
+        if (s_totalEthDepositedToAave[msg.sender] == 0) {
+            revert DeFiExchange__InsufficientDepositedToAaveETHBalance(msg.sender);
+        }
+        uint priceDAI = s_aaveOracle.getAssetPrice(address(s_DAIToken));
+        s_daiEthPrice = priceDAI;
+        assert(priceDAI != 0);
+        uint safeMaxDAIBorrow = AAVE_LTV * s_totalEthDepositedToAave[msg.sender] / (priceDAI * 100);
+        s_totalTokensBalance[msg.sender][address(s_DAIToken)] += safeMaxDAIBorrow;
+        s_aavePool.borrow(address(s_DAIToken), safeMaxDAIBorrow, AAVE_VARIABLE_RATE, AAVE_REFERAL_CODE, address(this));
+        emit BorrowedDAIFromAave(msg.sender, priceDAI, safeMaxDAIBorrow);
     }
 
     // UNISWAP SWAP TOKENS FUNCTIONS
@@ -349,19 +375,19 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         return s_withdrawFeePercentage;
     }
 
-    function getUserETHBalance(address user) external view returns (uint256) {
-        return s_totalEthBalance[user];
+    function getUserETHBalance() external view returns (uint256) {
+        return s_totalEthBalance[msg.sender];
     }
 
-    function getUserDAIBalance(address user) external view returns (uint256) {
-        return s_totalTokensBalance[user][address(s_DAIToken)];
+    function getUserDAIBalance() external view returns (uint256) {
+        return s_totalTokensBalance[msg.sender][address(s_DAIToken)];
     }
 
-    function getUserUSDTBalance(address user) external view returns (uint256) {
-        return s_totalTokensBalance[user][address(s_USDTToken)];
+    function getUserUSDTBalance() external view returns (uint256) {
+        return s_totalTokensBalance[msg.sender][address(s_USDTToken)];
     }
-    function getUserWETHBalance(address user) external view returns (uint256) {
-        return s_totalTokensBalance[user][address(s_WETHToken)];
+    function getUserWETHBalance() external view returns (uint256) {
+        return s_totalTokensBalance[msg.sender][address(s_WETHToken)];
     }
 
     function getTotalETHFees() external view returns (uint256) {
@@ -398,5 +424,9 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
     function getNFTUserDAILiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
         return s_NFTUserTokenLiquidityPoolAmounts[msg.sender][nftTokenId][address(s_DAIToken)];
+    }
+
+    function getUserTotalDepositedETHtoAave() external view returns (uint256) {
+        return s_totalEthDepositedToAave[msg.sender];
     }
 }

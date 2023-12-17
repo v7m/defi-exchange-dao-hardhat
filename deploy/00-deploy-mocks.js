@@ -13,6 +13,8 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
             "SwapRouterMock",
             "WrappedTokenGatewayMock",
             "PoolAddressesProviderMock",
+            "AaveOracleMock",
+            "PoolMock",
         ];
 
         log("----------------------------------------------------------");
