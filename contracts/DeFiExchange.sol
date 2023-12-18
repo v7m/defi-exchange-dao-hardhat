@@ -126,7 +126,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
     // LIQUIDITY POOL FUNCTIONS
 
-    function provideLiquidity(uint256 usdtAmount, uint256 daiAmount) external payable returns (uint256) {
+    function provideLiquidity(uint256 usdtAmount, uint256 daiAmount) external payable nonReentrant returns (uint256) {
         uint256 ethAmount = msg.value;
         if (ethAmount == 0 && usdtAmount == 0 && daiAmount == 0) {
             revert DeFiExchange__InvalidAmountForLiquidityProviding(msg.sender, ethAmount, usdtAmount, daiAmount);
@@ -156,7 +156,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         return liquidityPoolNFTTokenId;
     }
 
-    function redeemLiquidity(uint256 tokenId) external {
+    function redeemLiquidity(uint256 tokenId) external nonReentrant {
         if (!isOwnerOfNFT(msg.sender, tokenId)) {
             revert DeFiExchange__SenderIsNotOwnerOfNFT(msg.sender, tokenId);
         }
@@ -185,7 +185,6 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_liquidityPoolNFT.burnNFT(msg.sender, tokenId);
         emit LiquidityRedeemed(msg.sender, tokenId, ethAmount, daiAmount, usdtAmount);
     }
-
 
     function isOwnerOfNFT(address user, uint256 tokenId) public view returns (bool) {
         address owner = s_liquidityPoolNFT.ownerOf(tokenId);
@@ -299,7 +298,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         emit ETHDeposited(msg.sender, msg.value);
     }
 
-    function depositDAI(uint256 _amount) external {
+    function depositDAI(uint256 _amount) external nonReentrant {
         if (s_DAIToken.allowance(msg.sender, address(this)) < _amount) {
             revert DeFiExchange__InsufficientDepositTokenBalance(address(s_DAIToken), msg.sender);
         }
@@ -309,7 +308,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         emit TokenDeposited(address(s_DAIToken), msg.sender, _amount);
     }
 
-    function depositUSDT(uint256 _amount) external {
+    function depositUSDT(uint256 _amount) external nonReentrant {
         if (s_USDTToken.allowance(msg.sender, address(this)) < _amount) {
             revert DeFiExchange__InsufficientDepositTokenBalance(address(s_USDTToken), msg.sender);
         }
