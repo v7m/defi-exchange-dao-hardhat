@@ -19,6 +19,7 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
     Counters.Counter private s_tokenCounter;
     using Strings for uint256;
 
+    bool private s_initialized;
     address public s_liquidityPoolContractAddress;
 
     event NftMinted(uint256 tokenId, address minter, uint256 ethAmount, uint256 daiAmount, uint256 usdtAmount);
@@ -35,11 +36,12 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
     constructor() ERC721("LiquidityPoolNFT", "LPNFT") {}
 
     function initialize(address _liquidityPoolContractAddress) external onlyOwner {
-        if (s_liquidityPoolContractAddress != address(0)) {
+        if (s_initialized) {
             revert LiquidityPoolNFT__LiquidityPoolContractAlreadySet();
         }
 
         s_liquidityPoolContractAddress = _liquidityPoolContractAddress;
+        s_initialized = true;
         emit LiquidityPoolContractSet(_liquidityPoolContractAddress);
     }
 

@@ -9,6 +9,7 @@ error GovernanceToken__StakingContractAlreadySet();
 error GovernanceToken__AllowedOnlyForSkatingContract();
 
 contract GovernanceToken is ERC20Votes, Ownable {
+    bool private s_initialized;
     address public s_stakingContractAddress;
 
     event StakingContractSet(address stakingContractAddress);
@@ -27,11 +28,12 @@ contract GovernanceToken is ERC20Votes, Ownable {
     }
 
     function initialize(address _stakingContractAddress) external onlyOwner {
-        if (s_stakingContractAddress != address(0)) {
+        if (s_initialized) {
             revert GovernanceToken__StakingContractAlreadySet();
         }
 
         s_stakingContractAddress = _stakingContractAddress;
+        s_initialized = true;
         emit StakingContractSet(_stakingContractAddress);
     }
 
