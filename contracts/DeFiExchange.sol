@@ -116,6 +116,16 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_stakingToGovernancePercentage = stakingToGovernancePercentage;
     }
 
+    // Fallback function
+    fallback() external payable {
+        this.depositETH{value: msg.value}();
+    }
+
+    // Receive function
+    receive() external payable {
+        this.depositETH{value: msg.value}();
+    }
+
     function changeWithdrawFeePercentage(uint8 _withdrawFeePercentage) external onlyOwner {
         if (_withdrawFeePercentage > 100) {
             revert DeFiExchange__InvalidNewWithdrawFeePercentage(s_withdrawFeePercentage, _withdrawFeePercentage);
