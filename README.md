@@ -9,14 +9,14 @@ Decentralized Finance Exchange Decentralized Autonomous Organization
 
 The DeFi Exchange DAO is a multifaceted decentralized finance platform, offering a range of DeFi services and functionalities. It operates with a select group of cryptocurrencies, specifically Ethereum (`ETH`), `DAI`, `USDT`, and Wrapped Ethereum (`WETH`), providing users with various options for their DeFi transactions. Key features of the platform include:
 
-- **Deposits and Withdrawals**: Users can deposit and withdraw `ETH`, `DAI`, `USDT`, and `WETH`, facilitating flexible asset management.
+- **Deposits and Withdrawals**: Users can deposit and withdraw `ETH`, `DAI`, and `USDT`, facilitating flexible asset management.
 - **ETH Staking for Governance Token**s: The platform allows `ETH` staking, enabling users to earn governance tokens, which are instrumental in participating in the platform's decision-making processes.
-- **Token Swapping via Uniswap**: Users can swap between `ETH`, `DAI`, `USDT`, and `WETH` using the integrated `Uniswap` protocol, enhancing trading efficiency and accessibility.
+- **Token Swapping via Uniswap**: Users can swap between `ETH`, `DAI`, and `USDT` using the integrated `Uniswap` protocol, enhancing trading efficiency and accessibility.
 - **Interaction with Aave Protocol**: The platform integrates with `Aave`, allowing users to deposit and borrow the supported tokens, adding layers of utility and financial opportunities.
 - **Liquidity Provision and NFT Rewards**: Providing liquidity with the supported tokens earns users unique Liquidity Pool NFTs, representing their stake, which can be redeemed back for the initial tokens.
 - **Decentralized Governance**: Operating under a DAO structure, the platform empowers its users to vote on key proposals and platform updates using their governance tokens, ensuring a democratic and community-driven approach.
 
-This platform is designed to be a comprehensive DeFi solution, particularly focusing on `ETH`, `DAI`, `USDT`, and `WETH`, to cater to a broad spectrum of decentralized finance activities.
+This platform is designed to be a comprehensive DeFi solution, particularly focusing on `ETH`, `DAI`, and `USDT`, to cater to a broad spectrum of decentralized finance activities.
 
 ## Technical description
 
@@ -73,4 +73,10 @@ yarn coverage
 
 ```bash
 yarn lint
+```
+
+## Static analysis
+
+```bash
+yarn slither
 ```
