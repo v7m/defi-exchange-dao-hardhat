@@ -1,0 +1,75 @@
+default-environment: &default-environment
+  docker:
+    - image: cimg/node:16.20.2
+
+version: 2.1
+jobs:
+  dependencies:
+    <<: *default-environment
+    steps:
+      - checkout
+      - run: node --version
+      - run: yarn -v
+      - restore_cache:
+          name: Restore Yarn Package Cache
+          keys:
+            - yarn-deps-{{ checksum "yarn.lock" }}
+            - yarn-deps
+            - node_modules
+      - run:
+          name: Install Dependencies
+          command: yarn install --frozen-lockfile --cache-folder ~/.cache/yarn
+      - save_cache:
+          name: Save Yarn Package Cache
+          key: yarn-deps-{{ checksum "yarn.lock" }}-{{ epoch }}
+          paths:
+            - ~/.cache/yarn
+            - node_modules
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+
+  lint:
+    <<: *default-environment
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Linting
+          command: yarn lint
+
+  test:
+    <<: *default-environment
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Unit tests & coverage
+          command: yarn coverage
+
+  analysis:
+    <<: *default-environment
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Static analysis with Slither
+          command: yarn slither
+
+workflows:
+  dependencies-lint-and-test:
+    jobs:
+      - dependencies
+      - lint:
+          requires:
+            - dependencies
+      - test:
+          requires:
+            - lint
+      - analysis:
+          requires:
+            - test
