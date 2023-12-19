@@ -1,6 +1,8 @@
 # DeFi Exchange DAO
 Decentralized Finance Exchange Decentralized Autonomous Organization
 
+[![DFED](https://circleci.com/gh/v7m/defi-exchange-dao-hardhat.svg?style=shield)](https://app.circleci.com/pipelines/github/v7m/defi-exchange-dao-hardhat)
+
 > *This is an educational project with the purpose of acquiring hands-on experience in web3 application development using smart contracts written in Solidity.*
 
 ## Description
