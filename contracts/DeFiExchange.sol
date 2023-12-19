@@ -38,28 +38,28 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
     using TransferHelper for address;
 
-    uint8 AAVE_LTV = 80; // The maximum Loan To Value (LTV) ratio for the deposited asset/ETH = 0.8
-    uint8 AAVE_REFERAL_CODE = 0; // referralCode 0 is like none
-    uint8 AAVE_VARIABLE_RATE = 2; // 1 is stable rate, 2 is variable rate
+    uint8 public constant AAVE_LTV = 80; // The maximum Loan To Value (LTV) ratio for the deposited asset/ETH = 0.8
+    uint8 public constant AAVE_REFERAL_CODE = 0; // referralCode 0 is like none
+    uint8 public constant AAVE_VARIABLE_RATE = 2; // 1 is stable rate, 2 is variable rate
 
-    uint24 public s_uniswapPoolFee;
+    uint24 public immutable s_uniswapPoolFee;
+    uint8 public immutable s_stakingToGovernancePercentage;
+    address public immutable s_aavePoolAddress;
     uint8 public s_withdrawFeePercentage;
-    uint8 public s_stakingToGovernancePercentage;
-    address public s_aavePoolAddress;
     uint256 public s_totalEthFees;
-    uint256 public s_liquidityPoolETHAmounts;
+    uint256 public s_liquidityPoolETHAmount;
     uint256 public s_daiEthPrice;
 
-    IERC20 public s_DAIToken;
-    IERC20 public s_USDTToken;
-    IWETH public s_WETHToken;
-    ISwapRouter public s_uniswapSwapRouter;
-    IWrappedTokenGatewayV3 public s_aaveWrappedTokenGateway;
-    IPoolAddressesProvider public s_aavePoolAddressesProvider;
-    IPool public s_aavePool;
-    IAaveOracle public s_aaveOracle;
-    GovernanceToken public s_governanceToken;
-    LiquidityPoolNFT public s_liquidityPoolNFT;
+    IERC20 public immutable s_DAIToken;
+    IERC20 public immutable s_USDTToken;
+    IWETH public immutable s_WETHToken;
+    ISwapRouter public immutable s_uniswapSwapRouter;
+    IWrappedTokenGatewayV3 public immutable s_aaveWrappedTokenGateway;
+    IPoolAddressesProvider public immutable s_aavePoolAddressesProvider;
+    IPool public immutable s_aavePool;
+    IAaveOracle public immutable s_aaveOracle;
+    GovernanceToken public immutable s_governanceToken;
+    LiquidityPoolNFT public immutable s_liquidityPoolNFT;
 
     struct ContractAddreses {
         address DAITokenAddress;
@@ -160,7 +160,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
             s_liquidityPoolTokenAmounts[address(s_USDTToken)] += usdtAmount;
         }
         if (ethAmount > 0) {
-            s_liquidityPoolETHAmounts += ethAmount;
+            s_liquidityPoolETHAmount += ethAmount;
         }
         uint256 liquidityPoolNFTTokenId = s_liquidityPoolNFT.mintNFT(msg.sender, ethAmount, daiAmount, usdtAmount);
         s_NFTUserETHLiquidityPoolAmounts[msg.sender][liquidityPoolNFTTokenId] = ethAmount;
@@ -188,7 +188,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
             s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_USDTToken)] = 0;
         }
         if (ethAmount > 0) {
-            s_liquidityPoolETHAmounts -= ethAmount;
+            s_liquidityPoolETHAmount -= ethAmount;
             s_NFTUserETHLiquidityPoolAmounts[msg.sender][tokenId] = 0;
             (bool success, ) = payable(msg.sender).call{value: ethAmount}("");
             if (!success) {
@@ -416,7 +416,7 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     }
 
     function getLiquidityPoolETHAmount() external view returns (uint256) {
-        return s_liquidityPoolETHAmounts;
+        return s_liquidityPoolETHAmount;
     }
 
     function getLiquidityPoolDAIAmount() external view returns (uint256) {
