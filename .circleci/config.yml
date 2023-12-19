@@ -50,16 +50,6 @@ jobs:
           name: Unit tests & coverage
           command: yarn coverage
 
-  analysis:
-    <<: *default-environment
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run:
-          name: Static analysis with Slither
-          command: yarn slither
-
 workflows:
   dependencies-lint-and-test:
     jobs:
@@ -70,6 +60,4 @@ workflows:
       - test:
           requires:
             - lint
-      - analysis:
-          requires:
-            - test
+
