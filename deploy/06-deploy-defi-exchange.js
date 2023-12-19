@@ -12,22 +12,22 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log } = deployments;
     const { deployer } = await getNamedAccounts();
     const chainId = network.config.chainId;
-    const waitBlockConfirmations = networkConfig[network.name]["blockConfirmations"] || 1;
+    const waitBlockConfirmations = networkConfig[chainId]["blockConfirmations"] || 1;
     let DAITokenMockContract, USDTTokenMockContract, governanceTokenContract, DAIContractAddress, USDTContractAddress,
-        swapRouterContractAddress, swapRouterMockContract;
+        uniswapSwapRouterContractAddress, uniswapSwapRouterMockContract;
 
     if (developmentChains.includes(network.name)) {
         DAITokenMockContract = await ethers.getContract("DAITokenMock");
         USDTTokenMockContract = await ethers.getContract("USDTTokenMock");
         WETHTokenMockContract = await ethers.getContract("WETHTokenMock");
-        swapRouterMockContract = await ethers.getContract("SwapRouterMock");
+        uniswapSwapRouterMockContract = await ethers.getContract("SwapRouterMock");
         aaveWrappedTokenGatewayMockContract = await ethers.getContract("WrappedTokenGatewayMock");
         aavePoolAddressesProviderMockContract = await ethers.getContract("PoolAddressesProviderMock");
         aaveOraclePoolContractAddress = await ethers.getContract("AaveOracleMock");
         DAIContractAddress = DAITokenMockContract.address;
         USDTContractAddress = USDTTokenMockContract.address;
         WETHContractAddress = WETHTokenMockContract.address;
-        swapRouterContractAddress = swapRouterMockContract.address;
+        uniswapSwapRouterContractAddress = uniswapSwapRouterMockContract.address;
         aaveWrappedTokenGatewayContractAddress = aaveWrappedTokenGatewayMockContract.address;
         aavePoolAddressesProviderContractAddress = aavePoolAddressesProviderMockContract.address;
         aaveOraclePoolContractAddress = aaveOraclePoolContractAddress.address;
@@ -35,7 +35,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         DAIContractAddress = networkConfig[chainId]["DAIContractAddress"];
         USDTContractAddress = networkConfig[chainId]["USDTContractAddress"];
         WETHContractAddress = networkConfig[chainId]["WETHContractAddress"];
-        swapRouterContractAddress = networkConfig[chainId]["swapRouterContract"];
+        uniswapSwapRouterContractAddress = networkConfig[chainId]["uniswapSwapRouterContractAddress"];
         aaveWrappedTokenGatewayContractAddress = networkConfig[chainId]["aaveWrappedTokenGatewayContractAddress"];
         aavePoolAddressesProviderContractAddress = networkConfig[chainId]["aavePoolAddressesProviderAddress"];
         aaveOraclePoolContractAddress = networkConfig[chainId]["aaveOracleAddress"];
@@ -53,7 +53,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         aaveWrappedTokenGatewayContractAddress,
         aavePoolAddressesProviderContractAddress,
         aaveOraclePoolContractAddress,
-        swapRouterContractAddress,
+        uniswapSwapRouterContractAddress,
         UNISWAP_POOL_FEE,
         WITHDRAW_FEE_PERCENTAGE,
         STAKING_TO_GOVERNANCE_PERCENTAGE,
@@ -69,7 +69,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         waitConfirmations: waitBlockConfirmations,
     });
 
-    if (!developmentChains.includes(network.name) && process.env.ETHERSCAN_API_KEY) {
+    if (!developmentChains.includes(network.name) && process.env.POLYGONSCAN_API_KEY) {
         log("DeFiExchange contract verifying...");
         await verifyContract(deFiExchange.address, args);
     }

@@ -14,7 +14,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x";
 const POLYGON_MAINNET_RPC_URL = process.env.POLYGON_MAINNET_RPC_URL || "";
 const POLYGON_MUMBAI_RPC_URL = process.env.POLYGON_MUMBAI_RPC_URL || "";
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || "";
-const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY || "";
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
 const REPORT_GAS = process.env.REPORT_GAS || false;
 
@@ -35,18 +35,19 @@ module.exports = {
             url: POLYGON_MUMBAI_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
             saveDeployments: true,
-            chainId: 11155111,
+            chainId: 80001,
         },
         mainnet: {
             url: POLYGON_MAINNET_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
             saveDeployments: true,
-            chainId: 1,
+            chainId: 137,
         }
     },
     etherscan: {
         apiKey: {
-            sepolia: ETHERSCAN_API_KEY
+            polygon: POLYGONSCAN_API_KEY,
+            polygonMumbai: POLYGONSCAN_API_KEY,
         },
         customChains: []
     },

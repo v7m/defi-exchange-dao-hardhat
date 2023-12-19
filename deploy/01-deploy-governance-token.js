@@ -5,7 +5,8 @@ const { verifyContract } = require("../utils/verify-contract");
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log } = deployments;
     const { deployer } = await getNamedAccounts();
-    const waitBlockConfirmations = networkConfig[network.name]["blockConfirmations"] || 1;
+    const chainId = network.config.chainId;
+    const waitBlockConfirmations = networkConfig[chainId]["blockConfirmations"] || 1;
 
     log("----------------------------------------------------------");
     log("Deploying GovernanceToken contract...");
@@ -17,7 +18,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         waitConfirmations: waitBlockConfirmations,
     });
 
-    if (!developmentChains.includes(network.name) && process.env.ETHERSCAN_API_KEY) {
+    if (!developmentChains.includes(network.name) && process.env.POLYGONSCAN_API_KEY) {
         log("Verifying GovernanceToken contract...");
         await verifyContract(governanceToken.address, []);
     }

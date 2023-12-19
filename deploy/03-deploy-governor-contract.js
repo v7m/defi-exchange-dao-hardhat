@@ -11,7 +11,8 @@ const { verifyContract } = require("../utils/verify-contract");
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log, get } = deployments;
     const { deployer } = await getNamedAccounts();
-    const waitBlockConfirmations = networkConfig[network.name]["blockConfirmations"] || 1;
+    const chainId = network.config.chainId;
+    const waitBlockConfirmations = networkConfig[chainId]["blockConfirmations"] || 1;
     const governanceToken = await get("GovernanceToken");
     const timeLock = await get("TimeLock");
     const args = [
@@ -32,7 +33,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         waitConfirmations: waitBlockConfirmations,
     });
 
-    if (!developmentChains.includes(network.name) && process.env.ETHERSCAN_API_KEY) {
+    if (!developmentChains.includes(network.name) && process.env.POLYGONSCAN_API_KEY) {
         log("Verifying GovernorContract contract...");
         await verifyContract(governorContract.address, args);
     }
