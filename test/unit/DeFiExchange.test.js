@@ -37,6 +37,7 @@ chai.use(smock.matchers)
             aaveOracleContractFactory = await ethers.getContractFactory("AaveOracleMock");
             aavePoolMockContractFactory = await ethers.getContractFactory("PoolMock");
             swapRouterMockFactory = await ethers.getContractFactory("SwapRouterMock");
+            WETHTokenMockContract = await ethers.getContract("WETHTokenMock");
 
             DAITokenMockContract = await smock.fake(DAITokenMockContractFactory);
             USDTTokenMockContract = await smock.fake(USDTTokenMockContractFactory);
@@ -61,11 +62,9 @@ chai.use(smock.matchers)
             aavePoolAddressesProviderMockContract.getPool.returns(aavePoolMockContract.address);
             aavePoolMockContract.borrow.returns();
 
-            WETHTokenMockContract = await ethers.getContract("WETHTokenMock");
-
             deFiExchangeContractFactory = await ethers.getContractFactory('DeFiExchange');
 
-            deFiExchangeContract = await deFiExchangeContractFactory.deploy(
+            const contractAddresses = [
                 DAITokenMockContract.address,
                 USDTTokenMockContract.address,
                 WETHTokenMockContract.address,
@@ -75,6 +74,10 @@ chai.use(smock.matchers)
                 aavePoolAddressesProviderMockContract.address,
                 aaveOracleContract.address,
                 swapRouterMockContract.address,
+            ];
+
+            deFiExchangeContract = await deFiExchangeContractFactory.deploy(
+                contractAddresses,
                 uniswapPoolFee,
                 withdrawFeePercentage,
                 stakingToGovernancePercentage

@@ -44,7 +44,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     governanceTokenContract = await ethers.getContract("GovernanceToken");
     liquidityPoolNFTContract = await ethers.getContract("LiquidityPoolNFT");
 
-    const args = [
+    const contractAddresses = [
         DAIContractAddress,
         USDTContractAddress,
         WETHContractAddress,
@@ -54,6 +54,10 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         aavePoolAddressesProviderContractAddress,
         aaveOraclePoolContractAddress,
         uniswapSwapRouterContractAddress,
+    ];
+
+    const args = [
+        contractAddresses,
         UNISWAP_POOL_FEE,
         WITHDRAW_FEE_PERCENTAGE,
         STAKING_TO_GOVERNANCE_PERCENTAGE,

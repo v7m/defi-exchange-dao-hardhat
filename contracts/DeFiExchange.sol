@@ -61,6 +61,18 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     GovernanceToken public s_governanceToken;
     LiquidityPoolNFT public s_liquidityPoolNFT;
 
+    struct ContractAddreses {
+        address DAITokenAddress;
+        address USDTTokenAddress;
+        address WETHTokenAddress;
+        address liquidityPoolNFTAddress;
+        address governanceTokenAddress;
+        address aaveWrappedTokenGatewayAddress;
+        address aavePoolAddressesProviderAddress;
+        address aaveOracleAddress;
+        address uniswapSwapRouterAddress;
+    }
+
     mapping(address => uint256) public s_totalTokensFees;
     mapping(address => uint256) public s_totalEthStaking;
     mapping(address => uint256) public s_totalEthBalance;
@@ -87,30 +99,22 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     event ETHLiquidityRedeemd(address sender, uint256 ethAmount);
 
     constructor(
-        address DAITokenAddress,
-        address USDTTokenAddress,
-        address WETHTokenAddress,
-        address liquidityPoolNFTAddress,
-        address governanceTokenAddress,
-        address aaveWrappedTokenGatewayAddress,
-        address aavePoolAddressesProviderAddress,
-        address aaveOracleAddress,
-        address uniswapSwapRouterAddress,
+        ContractAddreses memory addresses,
         uint24 uniswapPoolFee,
         uint8 withdrawFeePercentage,
         uint8 stakingToGovernancePercentage
     ) {
-        s_DAIToken = IERC20(DAITokenAddress);
-        s_USDTToken = IERC20(USDTTokenAddress);
-        s_WETHToken = IWETH(WETHTokenAddress);
-        s_liquidityPoolNFT = LiquidityPoolNFT(liquidityPoolNFTAddress);
-        s_governanceToken = GovernanceToken(governanceTokenAddress);
-        s_aaveWrappedTokenGateway = IWrappedTokenGatewayV3(aaveWrappedTokenGatewayAddress);
-        s_aavePoolAddressesProvider = IPoolAddressesProvider(aavePoolAddressesProviderAddress);
+        s_DAIToken = IERC20(addresses.DAITokenAddress);
+        s_USDTToken = IERC20(addresses.USDTTokenAddress);
+        s_WETHToken = IWETH(addresses.WETHTokenAddress);
+        s_liquidityPoolNFT = LiquidityPoolNFT(addresses.liquidityPoolNFTAddress);
+        s_governanceToken = GovernanceToken(addresses.governanceTokenAddress);
+        s_aaveWrappedTokenGateway = IWrappedTokenGatewayV3(addresses.aaveWrappedTokenGatewayAddress);
+        s_aavePoolAddressesProvider = IPoolAddressesProvider(addresses.aavePoolAddressesProviderAddress);
         s_aavePoolAddress = s_aavePoolAddressesProvider.getPool();
         s_aavePool = IPool(s_aavePoolAddress);
-        s_aaveOracle = IAaveOracle(aaveOracleAddress);
-        s_uniswapSwapRouter = ISwapRouter(uniswapSwapRouterAddress);
+        s_aaveOracle = IAaveOracle(addresses.aaveOracleAddress);
+        s_uniswapSwapRouter = ISwapRouter(addresses.uniswapSwapRouterAddress);
         s_uniswapPoolFee = uniswapPoolFee;
         s_withdrawFeePercentage = withdrawFeePercentage;
         s_stakingToGovernancePercentage = stakingToGovernancePercentage;
