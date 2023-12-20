@@ -12,9 +12,9 @@ contract GovernanceToken is ERC20Votes, Ownable {
     bool private s_initialized;
     address public s_stakingContractAddress;
 
-    event StakingContractSet(address stakingContractAddress);
-    event GovernanceTokensMinted(address recipient, uint256 amount);
-    event GovernanceTokensBurned(address recipient, uint256 amount);
+    event StakingContractSet(address indexed stakingContractAddress);
+    event GovernanceTokensMinted(address indexed recipient, uint256 amount);
+    event GovernanceTokensBurned(address indexed recipient, uint256 amount);
 
     modifier onlyStakingContract() {
         if (msg.sender != s_stakingContractAddress) {

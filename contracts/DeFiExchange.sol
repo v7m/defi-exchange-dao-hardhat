@@ -84,19 +84,19 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     // user address => NFT tokenId => amount
     mapping(address => mapping(uint256 => uint256)) public s_NFTUserETHLiquidityPoolAmounts;
 
-    event ETHDeposited(address sender, uint256 amount);
-    event ETHWithdrawn(address sender, uint256 amount);
-    event TokenDeposited(address token, address sender, uint256 amount);
-    event TokenWithdrawn(address token, address sender, uint256 amount);
+    event ETHDeposited(address indexed sender, uint256 amount);
+    event ETHWithdrawn(address indexed sender, uint256 amount);
+    event TokenDeposited(address indexed token, address indexed sender, uint256 amount);
+    event TokenWithdrawn(address indexed token, address indexed sender, uint256 amount);
     event WithdrawFeePercentageChanged(uint8 newWithdrawFeePercentage);
-    event StakedETHForGovernance(address sender, uint256 stakingAmount, uint256 governanceAmount);
-    event WithdrawStakedETHForGovernance(address sender, uint256 stakingAmount, uint256 governanceAmount);
-    event UniswapTokensSwapPerformed(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
-    event ETHDepositedToAave(address sender, uint256 amount);
-    event BorrowedDAIFromAave(address sender, uint256 priceDAI, uint256 amount);
-    event LiquidityProvided(address sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
-    event LiquidityRedeemed(address sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
-    event ETHLiquidityRedeemd(address sender, uint256 ethAmount);
+    event StakedETHForGovernance(address indexed sender, uint256 stakingAmount, uint256 governanceAmount);
+    event WithdrawStakedETHForGovernance(address indexed sender, uint256 stakingAmount, uint256 governanceAmount);
+    event UniswapTokensSwapPerformed(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
+    event ETHDepositedToAave(address indexed sender, uint256 amount);
+    event BorrowedDAIFromAave(address indexed sender, uint256 priceDAI, uint256 amount);
+    event LiquidityProvided(address indexed sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
+    event LiquidityRedeemed(address indexed sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
+    event ETHLiquidityRedeemd(address indexed sender, uint256 ethAmount);
 
     constructor(
         ContractAddreses memory addresses,

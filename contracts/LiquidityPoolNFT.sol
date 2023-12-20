@@ -22,8 +22,8 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
     bool private s_initialized;
     address public s_liquidityPoolContractAddress;
 
-    event NftMinted(uint256 tokenId, address minter, uint256 ethAmount, uint256 daiAmount, uint256 usdtAmount);
-    event NftBurned(uint256 tokenId, address burner);
+    event NftMinted(uint256 tokenId, address indexed minter, uint256 ethAmount, uint256 daiAmount, uint256 usdtAmount);
+    event NftBurned(uint256 tokenId, address indexed burner);
     event LiquidityPoolContractSet(address liquidityPoolContractAddress);
 
     modifier onlyLiquidityPoolContract() {
