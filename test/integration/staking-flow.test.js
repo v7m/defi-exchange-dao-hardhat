@@ -27,14 +27,14 @@ chai.use(smock.matchers)
 
         describe("stake ETH for Governance", async () => {
             it("stakes ETH amount and mints governance tokens", async () => {
-                const stakingAmountBefore = await deFiExchangeContract.s_totalEthStaking(user.address);
+                const stakingAmountBefore = await deFiExchangeContract.getUserEthStaked();
                 const userGovernanceBefore = await governanceTokenContract.balanceOf(user.address);
 
                 expect(stakingAmountBefore).to.eq(0);
                 expect(userGovernanceBefore).to.equal(0);
 
                 await deFiExchangeContract.stakeETHForGovernance({ value: amount });
-                const stakingAmountAfter = await deFiExchangeContract.s_totalEthStaking(user.address);
+                const stakingAmountAfter = await deFiExchangeContract.getUserEthStaked();
                 const userGovernanceAfter = await governanceTokenContract.balanceOf(user.address);
 
                 expect(stakingAmountAfter).to.eq(amount);
@@ -48,14 +48,14 @@ chai.use(smock.matchers)
             });
 
             it("withdraws staked ETH amount and burns governance tokens", async () => {
-                const stakingAmountBefore = await deFiExchangeContract.s_totalEthStaking(user.address);
+                const stakingAmountBefore = await deFiExchangeContract.getUserEthStaked();
                 const userGovernanceBefore = await governanceTokenContract.balanceOf(user.address);
 
                 expect(stakingAmountBefore).to.eq(amount);
                 expect(userGovernanceBefore).to.equal(amount);
 
                 await deFiExchangeContract.withdrawStakedETHForGovernance();
-                const stakingAmountAfter = await deFiExchangeContract.s_totalEthStaking(user.address);
+                const stakingAmountAfter = await deFiExchangeContract.getUserEthStaked();
                 const userGovernanceAfter = await governanceTokenContract.balanceOf(user.address);
 
                 expect(stakingAmountAfter).to.eq(0);

@@ -563,14 +563,14 @@ chai.use(smock.matchers)
 
                 it("updates staking amount", async () => {
                     await deFiExchangeContract.stakeETHForGovernance({ value: amount });
-                    const stakingAmountAfter = await deFiExchangeContract.s_totalEthStaking(user.address);
+                    const stakingAmountAfter = await deFiExchangeContract.getUserEthStaked();
 
                     expect(stakingAmountAfter).to.eq(amount);
                 });
 
                 it("mints governance tokens", async () => {
                     await deFiExchangeContract.stakeETHForGovernance({ value: amount });
-                    const stakingAmountAfter = await deFiExchangeContract.s_totalEthStaking(user.address);
+                    const stakingAmountAfter = await deFiExchangeContract.getUserEthStaked();
                     const governanceTokenAmount = stakingAmountAfter.mul(stakingToGovernancePercentage).div(100);
 
                     expect(
@@ -610,13 +610,13 @@ chai.use(smock.matchers)
 
                 it("updates staking amount", async () => {
                     await deFiExchangeContract.withdrawStakedETHForGovernance();
-                    const stakingAmountAfter = await deFiExchangeContract.s_totalEthStaking(user.address);
+                    const stakingAmountAfter = await deFiExchangeContract.getUserETHBalance();
 
                     expect(stakingAmountAfter).to.eq(0);
                 });
 
                 it("burns governance tokens", async () => {
-                    const stakingAmountBefore = await deFiExchangeContract.s_totalEthStaking(user.address);
+                    const stakingAmountBefore = await deFiExchangeContract.getUserEthStaked();
                     await deFiExchangeContract.withdrawStakedETHForGovernance();
                     const governanceTokenAmount = stakingAmountBefore.mul(stakingToGovernancePercentage).div(100);
 
@@ -660,7 +660,7 @@ chai.use(smock.matchers)
 
             it("updates user's ETH balance", async () => {
                 await deFiExchangeContract.depositETH({ value: amount });
-                const totalBalance = await deFiExchangeContract.s_totalEthBalance(user.address);
+                const totalBalance = await deFiExchangeContract.getUserETHBalance();
                 
                 expect(totalBalance).to.eq(amount);
             });
@@ -768,7 +768,7 @@ chai.use(smock.matchers)
                 });
 
                 it("withdraws amount", async () => {
-                    const userAmountBefore = await deFiExchangeContract.s_totalEthBalance(user.address);
+                    const userAmountBefore = await deFiExchangeContract.getUserETHBalance();
                     const userBalanceBefore = await user.getBalance();
                     const txResponse = await deFiExchangeContract.withdrawETH();
                     const transactionReceipt = await txResponse.wait(1);
@@ -782,12 +782,12 @@ chai.use(smock.matchers)
                 });
 
                 it("withdraws fee", async () => {
-                    const feeAmountBefore = await deFiExchangeContract.s_totalEthFees();
+                    const feeAmountBefore = await deFiExchangeContract.getTotalETHFees();
 
                     expect(feeAmountBefore).to.eq(0);
 
                     await deFiExchangeContract.withdrawETH();
-                    const feeAmountAfter = await deFiExchangeContract.s_totalEthFees();
+                    const feeAmountAfter = await deFiExchangeContract.getTotalETHFees();
 
                     expect(feeAmountAfter).to.eq(feeAmount);
                 });

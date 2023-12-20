@@ -33,23 +33,21 @@ error DeFiExchange__InsufficientLiquidityProvidingETHBalance(address sender, uin
 error DeFiExchange__SenderIsNotOwnerOfNFT(address sender, uint256 tokenId);
 error DeFiExchange__RedeemLiquidityETHFail(address sender, uint256 amount);
 
-
 contract DeFiExchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
     using TransferHelper for address;
 
+    // Constants
     uint8 public constant AAVE_LTV = 80; // The maximum Loan To Value (LTV) ratio for the deposited asset/ETH = 0.8
     uint8 public constant AAVE_REFERAL_CODE = 0; // referralCode 0 is like none
     uint8 public constant AAVE_VARIABLE_RATE = 2; // 1 is stable rate, 2 is variable rate
 
+    // Immutable State Variables
     uint24 public immutable s_uniswapPoolFee;
     uint8 public immutable s_stakingToGovernancePercentage;
     address public immutable s_aavePoolAddress;
-    uint8 public s_withdrawFeePercentage;
-    uint256 public s_totalEthFees;
-    uint256 public s_liquidityPoolETHAmount;
-    uint256 public s_daiEthPrice;
 
+    // External Contract References
     IERC20 public immutable s_DAIToken;
     IERC20 public immutable s_USDTToken;
     IWETH public immutable s_WETHToken;
@@ -60,6 +58,10 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     IAaveOracle public immutable s_aaveOracle;
     GovernanceToken public immutable s_governanceToken;
     LiquidityPoolNFT public immutable s_liquidityPoolNFT;
+
+    // Regular State Variables
+    uint256 public s_daiEthPrice;
+    uint8 public s_withdrawFeePercentage;
 
     struct ContractAddreses {
         address DAITokenAddress;
@@ -73,16 +75,29 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         address uniswapSwapRouterAddress;
     }
 
-    mapping(address => uint256) public s_totalTokensFees;
-    mapping(address => uint256) public s_totalEthStaking;
-    mapping(address => uint256) public s_totalEthBalance;
-    mapping(address => mapping(address => uint256)) public s_totalTokensBalance;
-    mapping(address => uint256) public s_totalEthDepositedToAave;
-    mapping(address => uint256) public s_liquidityPoolTokenAmounts;
-    // user address => NFT tokenId => token address => amount
-    mapping(address => mapping(uint256 => mapping(address => uint256))) public s_NFTUserTokenLiquidityPoolAmounts;
-    // user address => NFT tokenId => amount
-    mapping(address => mapping(uint256 => uint256)) public s_NFTUserETHLiquidityPoolAmounts;
+    struct FeesAmounts {
+        uint256 ethFees;
+        mapping(address => uint256) tokensFees;
+    }
+
+    struct LiquidityProvidedAmounts {
+        uint256 ethAmount;
+        mapping(address => uint256) tokensAmounts;
+    }
+
+    struct UserBalances {
+        uint256 ethBalance;
+        mapping(address => uint256) tokensBalances;
+        uint256 ethDepositedToAave;
+        uint256 ethStaked;
+        mapping(uint256 => mapping(address => uint256)) nftTokensLiquidityProvided;
+        mapping(uint256 => uint256) nftEthLiquidityProvided;
+    }
+
+    // State Variables for Structs
+    FeesAmounts private s_feesAmounts;
+    LiquidityProvidedAmounts private s_liquidityProvidedAmounts;
+    mapping(address => UserBalances) private s_userBalances;
 
     event ETHDeposited(address indexed sender, uint256 amount);
     event ETHWithdrawn(address indexed sender, uint256 amount);
@@ -120,12 +135,10 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         s_stakingToGovernancePercentage = stakingToGovernancePercentage;
     }
 
-    // Fallback function
     fallback() external payable {
         this.depositETH{value: msg.value}();
     }
 
-    // Receive function
     receive() external payable {
         this.depositETH{value: msg.value}();
     }
@@ -150,22 +163,23 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
                 revert DeFiExchange__InsufficientLiquidityProvidingTokenBalance(address(s_DAIToken), msg.sender, daiAmount);
             }
             s_DAIToken.safeTransferFrom(msg.sender, address(this), daiAmount);
-            s_liquidityPoolTokenAmounts[address(s_DAIToken)] += daiAmount;
+            s_liquidityProvidedAmounts.tokensAmounts[address(s_DAIToken)] += daiAmount;
         }
         if (usdtAmount > 0) {
             if (s_USDTToken.allowance(msg.sender, address(this)) < usdtAmount) {
                 revert DeFiExchange__InsufficientLiquidityProvidingTokenBalance(address(s_USDTToken), msg.sender, usdtAmount);
             }
             s_USDTToken.safeTransferFrom(msg.sender, address(this), usdtAmount);
-            s_liquidityPoolTokenAmounts[address(s_USDTToken)] += usdtAmount;
+            s_liquidityProvidedAmounts.tokensAmounts[address(s_USDTToken)] += usdtAmount;
         }
         if (ethAmount > 0) {
-            s_liquidityPoolETHAmount += ethAmount;
+            s_liquidityProvidedAmounts.ethAmount += ethAmount;
         }
+        UserBalances storage userBalance = s_userBalances[msg.sender];
         uint256 liquidityPoolNFTTokenId = s_liquidityPoolNFT.mintNFT(msg.sender, ethAmount, daiAmount, usdtAmount);
-        s_NFTUserETHLiquidityPoolAmounts[msg.sender][liquidityPoolNFTTokenId] = ethAmount;
-        s_NFTUserTokenLiquidityPoolAmounts[msg.sender][liquidityPoolNFTTokenId][address(s_DAIToken)] = daiAmount;
-        s_NFTUserTokenLiquidityPoolAmounts[msg.sender][liquidityPoolNFTTokenId][address(s_USDTToken)] = usdtAmount;
+        userBalance.nftEthLiquidityProvided[liquidityPoolNFTTokenId] = ethAmount;
+        userBalance.nftTokensLiquidityProvided[liquidityPoolNFTTokenId][address(s_DAIToken)] = daiAmount;
+        userBalance.nftTokensLiquidityProvided[liquidityPoolNFTTokenId][address(s_USDTToken)] = usdtAmount;
         emit LiquidityProvided(msg.sender, liquidityPoolNFTTokenId, ethAmount, usdtAmount, daiAmount);
         return liquidityPoolNFTTokenId;
     }
@@ -174,22 +188,23 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         if (!isOwnerOfNFT(msg.sender, tokenId)) {
             revert DeFiExchange__SenderIsNotOwnerOfNFT(msg.sender, tokenId);
         }
-        uint256 ethAmount = s_NFTUserETHLiquidityPoolAmounts[msg.sender][tokenId];
-        uint256 daiAmount = s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_DAIToken)];
-        uint256 usdtAmount = s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_USDTToken)];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        uint256 ethAmount = userBalance.nftEthLiquidityProvided[tokenId];
+        uint256 daiAmount = userBalance.nftTokensLiquidityProvided[tokenId][address(s_DAIToken)];
+        uint256 usdtAmount = userBalance.nftTokensLiquidityProvided[tokenId][address(s_USDTToken)];
         if (daiAmount > 0) {
             s_DAIToken.safeTransfer(msg.sender, daiAmount);
-            s_liquidityPoolTokenAmounts[address(s_DAIToken)] -= daiAmount;
-            s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_DAIToken)] = 0;
+            s_liquidityProvidedAmounts.tokensAmounts[address(s_DAIToken)] -= daiAmount;
+            userBalance.nftTokensLiquidityProvided[tokenId][address(s_DAIToken)] = 0;
         }
         if (usdtAmount > 0) {
             s_USDTToken.safeTransfer(msg.sender, usdtAmount);
-            s_liquidityPoolTokenAmounts[address(s_USDTToken)] -= usdtAmount;
-            s_NFTUserTokenLiquidityPoolAmounts[msg.sender][tokenId][address(s_USDTToken)] = 0;
+            s_liquidityProvidedAmounts.tokensAmounts[address(s_USDTToken)] -= usdtAmount;
+            userBalance.nftTokensLiquidityProvided[tokenId][address(s_USDTToken)] = 0;
         }
         if (ethAmount > 0) {
-            s_liquidityPoolETHAmount -= ethAmount;
-            s_NFTUserETHLiquidityPoolAmounts[msg.sender][tokenId] = 0;
+            s_liquidityProvidedAmounts.ethAmount -= ethAmount;
+            userBalance.nftEthLiquidityProvided[tokenId] = 0;
             (bool success, ) = payable(msg.sender).call{value: ethAmount}("");
             if (!success) {
                 revert DeFiExchange__RedeemLiquidityETHFail(msg.sender, ethAmount);
@@ -208,26 +223,28 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     // AAVE FUNCTIONS
 
     function depositETHToAave(uint256 amount) external nonReentrant {
-        if (s_totalEthBalance[msg.sender] < amount) {
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        if (userBalance.ethBalance < amount) {
             revert DeFiExchange__NotEnoughETHForDepositingToAave(msg.sender, amount);
         }
         address onBehalfOf = address(this);
-        s_totalEthBalance[msg.sender] -= amount;
-        s_totalTokensBalance[msg.sender][address(s_WETHToken)] += amount;
-        s_totalEthDepositedToAave[msg.sender] += amount;
+        userBalance.ethBalance -= amount;
+        userBalance.tokensBalances[address(s_WETHToken)] += amount;
+        userBalance.ethDepositedToAave += amount;
         s_aaveWrappedTokenGateway.depositETH{ value: amount }(s_aavePoolAddress, onBehalfOf, 0);
         emit ETHDepositedToAave(msg.sender, amount);
     }
 
     function borrowDAIFromAave() external nonReentrant {
-        if (s_totalEthDepositedToAave[msg.sender] == 0) {
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        if (userBalance.ethDepositedToAave == 0) {
             revert DeFiExchange__InsufficientDepositedToAaveETHBalance(msg.sender);
         }
         uint priceDAI = s_aaveOracle.getAssetPrice(address(s_DAIToken));
         s_daiEthPrice = priceDAI;
         assert(priceDAI != 0);
-        uint safeMaxDAIBorrow = AAVE_LTV * s_totalEthDepositedToAave[msg.sender] / (priceDAI * 100);
-        s_totalTokensBalance[msg.sender][address(s_DAIToken)] += safeMaxDAIBorrow;
+        uint safeMaxDAIBorrow = AAVE_LTV * userBalance.ethDepositedToAave / (priceDAI * 100);
+        userBalance.tokensBalances[address(s_DAIToken)] += safeMaxDAIBorrow;
         s_aavePool.borrow(address(s_DAIToken), safeMaxDAIBorrow, AAVE_VARIABLE_RATE, AAVE_REFERAL_CODE, address(this));
         emit BorrowedDAIFromAave(msg.sender, priceDAI, safeMaxDAIBorrow);
     }
@@ -247,7 +264,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         address tokenOutAddress,
         uint256 amountIn
     ) public nonReentrant {
-        if (s_totalTokensBalance[msg.sender][tokenInAddress] < amountIn) {
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        if (userBalance.tokensBalances[tokenInAddress] < amountIn) {
             revert DeFiExchange__InsufficientSwapTokensBalance(tokenInAddress, msg.sender, amountIn);
         }
 
@@ -265,8 +283,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
 
         uint amountOut = s_uniswapSwapRouter.exactInputSingle(params);
 
-        s_totalTokensBalance[msg.sender][tokenInAddress] -= amountIn;
-        s_totalTokensBalance[msg.sender][tokenOutAddress] += amountOut;
+        userBalance.tokensBalances[tokenInAddress] -= amountIn;
+        userBalance.tokensBalances[tokenOutAddress] += amountOut;
         emit UniswapTokensSwapPerformed(tokenInAddress, tokenOutAddress, amountIn, amountOut);
     }
 
@@ -278,20 +296,22 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
             revert DeFiExchange__NotEnoughETHForStaking(msg.sender);
         }
         uint256 governanceAmount = calculateGovernanceTokensAmount(stakingAmount);
-        s_totalEthStaking[msg.sender] += stakingAmount;
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        userBalance.ethStaked += stakingAmount;
         s_governanceToken.mint(msg.sender, governanceAmount);
 
         emit StakedETHForGovernance(msg.sender, stakingAmount, governanceAmount);
     }
 
     function withdrawStakedETHForGovernance() external nonReentrant {
-        uint256 stakedAmount = s_totalEthStaking[msg.sender];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        uint256 stakedAmount = userBalance.ethStaked;
         if (stakedAmount == 0) {
             revert DeFiExchange__ETHIsNotStaked(msg.sender);
         }
         uint256 governanceAmount = calculateGovernanceTokensAmount(stakedAmount);
         s_governanceToken.burn(msg.sender, governanceAmount);
-        s_totalEthStaking[msg.sender] = 0;
+        userBalance.ethStaked = 0;
         (bool success, ) = payable(msg.sender).call{value: stakedAmount}("");
         if (!success) {
             revert DeFiExchange__WithdrawStakedETHFail(msg.sender);
@@ -308,7 +328,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     // DEPOSIT FUNCTIONS
 
     function depositETH() external payable {
-        s_totalEthBalance[msg.sender] = s_totalEthBalance[msg.sender] + msg.value;
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        userBalance.ethBalance += msg.value;
         emit ETHDeposited(msg.sender, msg.value);
     }
 
@@ -318,7 +339,8 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
 
         s_DAIToken.safeTransferFrom(msg.sender, address(this), _amount);
-        s_totalTokensBalance[msg.sender][address(s_DAIToken)] += _amount;
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        userBalance.tokensBalances[address(s_DAIToken)] += _amount;
         emit TokenDeposited(address(s_DAIToken), msg.sender, _amount);
     }
 
@@ -328,21 +350,23 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
         }
 
         s_USDTToken.safeTransferFrom(msg.sender, address(this), _amount);
-        s_totalTokensBalance[msg.sender][address(s_USDTToken)] += _amount;
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        userBalance.tokensBalances[address(s_USDTToken)] += _amount;
         emit TokenDeposited(address(s_DAIToken), msg.sender, _amount);
     }
 
     // WITHDRAW FUNCTIONS
 
     function withdrawETH() external nonReentrant() {
-        uint256 totalAmount = s_totalEthBalance[msg.sender];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        uint256 totalAmount = userBalance.ethBalance;
         if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawETHBalance(msg.sender);
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
-        s_totalEthFees += fee;
-        s_totalEthBalance[msg.sender] = 0;
+        s_feesAmounts.ethFees += fee;
+        userBalance.ethBalance = 0;
         (bool success, ) = payable(msg.sender).call{value: withdrawAmount}("");
         if (!success) {
             revert DeFiExchange__WithdrawETHFail(msg.sender);
@@ -351,27 +375,30 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     }
 
     function withdrawDAI() external nonReentrant() {
-        uint256 totalAmount = s_totalTokensBalance[msg.sender][address(s_DAIToken)];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+
+        uint256 totalAmount = userBalance.tokensBalances[address(s_DAIToken)];
         if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawTokenBalance(address(s_DAIToken), msg.sender);
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
-        s_totalTokensFees[address(s_DAIToken)] += fee;
-        s_totalTokensBalance[msg.sender][address(s_DAIToken)] = 0;
+        s_feesAmounts.tokensFees[address(s_DAIToken)] += fee;
+        userBalance.tokensBalances[address(s_DAIToken)] = 0;
         s_DAIToken.safeTransfer(msg.sender, withdrawAmount);
         emit TokenWithdrawn(address(s_DAIToken), msg.sender, withdrawAmount);
     }
 
     function withdrawUSDT() external nonReentrant() {
-        uint256 totalAmount = s_totalTokensBalance[msg.sender][address(s_USDTToken)];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        uint256 totalAmount = userBalance.tokensBalances[address(s_USDTToken)];
         if (totalAmount <= 0) {
             revert DeFiExchange__InsufficientWithdrawTokenBalance(address(s_USDTToken), msg.sender);
         }
         uint256 fee = calculateWithdrawalFee(totalAmount);
         uint256 withdrawAmount = totalAmount - fee;
-        s_totalTokensFees[address(s_USDTToken)] += fee;
-        s_totalTokensBalance[msg.sender][address(s_USDTToken)] = 0;
+        s_feesAmounts.tokensFees[address(s_USDTToken)] += fee;
+        userBalance.tokensBalances[address(s_USDTToken)] = 0;
         s_USDTToken.safeTransfer(msg.sender, withdrawAmount);
         emit TokenWithdrawn(address(s_USDTToken), msg.sender, withdrawAmount);
     }
@@ -389,57 +416,70 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     }
 
     function getUserETHBalance() external view returns (uint256) {
-        return s_totalEthBalance[msg.sender];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.ethBalance;
     }
 
     function getUserDAIBalance() external view returns (uint256) {
-        return s_totalTokensBalance[msg.sender][address(s_DAIToken)];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.tokensBalances[address(s_DAIToken)];
     }
 
     function getUserUSDTBalance() external view returns (uint256) {
-        return s_totalTokensBalance[msg.sender][address(s_USDTToken)];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.tokensBalances[address(s_USDTToken)];
     }
     function getUserWETHBalance() external view returns (uint256) {
-        return s_totalTokensBalance[msg.sender][address(s_WETHToken)];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.tokensBalances[address(s_WETHToken)];
     }
 
     function getTotalETHFees() external view returns (uint256) {
-        return s_totalEthFees;
+        return s_feesAmounts.ethFees;
     }
 
     function getTotalDAIFees() external view returns (uint256) {
-        return s_totalTokensFees[address(s_DAIToken)];
+        return s_feesAmounts.tokensFees[address(s_DAIToken)];
     }
 
     function getTotalUSDTFees() external view returns (uint256) {
-        return s_totalTokensFees[address(s_USDTToken)];
+        return s_feesAmounts.tokensFees[address(s_USDTToken)];
     }
 
     function getLiquidityPoolETHAmount() external view returns (uint256) {
-        return s_liquidityPoolETHAmount;
+        return s_liquidityProvidedAmounts.ethAmount;
     }
 
     function getLiquidityPoolDAIAmount() external view returns (uint256) {
-        return s_liquidityPoolTokenAmounts[address(s_DAIToken)];
+        return s_liquidityProvidedAmounts.tokensAmounts[address(s_DAIToken)];
     }
 
     function getLiquidityPoolUSDTAmount() external view returns (uint256) {
-        return s_liquidityPoolTokenAmounts[address(s_USDTToken)];
+        return s_liquidityProvidedAmounts.tokensAmounts[address(s_USDTToken)];
     }
 
     function getNFTUserETHLiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
-        return s_NFTUserETHLiquidityPoolAmounts[msg.sender][nftTokenId];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.nftEthLiquidityProvided[nftTokenId];
     }
 
     function getNFTUserUSDTLiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
-        return s_NFTUserTokenLiquidityPoolAmounts[msg.sender][nftTokenId][address(s_USDTToken)];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.nftTokensLiquidityProvided[nftTokenId][address(s_USDTToken)];
     }
 
     function getNFTUserDAILiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
-        return s_NFTUserTokenLiquidityPoolAmounts[msg.sender][nftTokenId][address(s_DAIToken)];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.nftTokensLiquidityProvided[nftTokenId][address(s_DAIToken)];
     }
 
     function getUserTotalDepositedETHtoAave() external view returns (uint256) {
-        return s_totalEthDepositedToAave[msg.sender];
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.ethDepositedToAave;
+    }
+
+    function getUserEthStaked() external view returns (uint256) {
+        UserBalances storage userBalance = s_userBalances[msg.sender];
+        return userBalance.ethStaked;
     }
 }
