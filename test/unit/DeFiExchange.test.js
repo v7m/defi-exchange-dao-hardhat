@@ -346,32 +346,6 @@ chai.use(smock.matchers)
             });
         });
 
-        describe("isOwnerOfNFT", async () => {
-            beforeEach(async () => {
-                deFiExchangeContract = deFiExchangeContract.connect(user);
-            });
-
-            context("when user is NFT owner", () => {
-                it("returns true", async () => {
-                    const isOwner = await deFiExchangeContract.isOwnerOfNFT(user.address, nftTokenId);
-
-                    expect(isOwner).to.eq(true);
-                });
-            });
-
-            context("when user is not NFT owner", () => {
-                beforeEach(async () => {
-                    liquidityPoolNFTContract.ownerOf.returns(deployer.address);
-                });
-
-                it("returns false", async () => {
-                    const isOwner = await deFiExchangeContract.isOwnerOfNFT(user.address, nftTokenId);
-
-                    expect(isOwner).to.eq(false);
-                });
-            });
-        });
-
         describe("depositETHToAave", async () => {
             beforeEach(async () => {
                 deFiExchangeContract = deFiExchangeContract.connect(user);

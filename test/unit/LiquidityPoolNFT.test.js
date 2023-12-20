@@ -61,11 +61,11 @@ const { developmentChains } = require("../../helper-hardhat-config");
                     it("returns correct balance of an NFT", async function () {
                         await liquidityPoolNFTContract.mintNFT(user.address, ethAmount, daiAmount, usdtAmount);
                         const userAddress = user.address;
-                        const userBalance = await liquidityPoolNFTContract.balanceOf(userAddress);
+                        const userBalances = await liquidityPoolNFTContract.balanceOf(userAddress);
                         const owner = await liquidityPoolNFTContract.ownerOf("0");
 
                         expect(owner).to.eq(userAddress);
-                        expect(userBalance.toString()).to.eq("1");
+                        expect(userBalances.toString()).to.eq("1");
                     });
 
                     it("emits NFTMinted event", async () => {
@@ -114,9 +114,9 @@ const { developmentChains } = require("../../helper-hardhat-config");
                     it("burns an NFT and returns correct balance of an NFT", async function () {
                         await liquidityPoolNFTContract.burnNFT(user.address, "0");
                         const userAddress = user.address;
-                        const userBalance = await liquidityPoolNFTContract.balanceOf(userAddress);
+                        const userBalances = await liquidityPoolNFTContract.balanceOf(userAddress);
 
-                        expect(userBalance.toString()).to.eq("0");
+                        expect(userBalances.toString()).to.eq("0");
                     });
 
                     it("emits NFTBurned event", async () => {
