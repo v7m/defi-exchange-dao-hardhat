@@ -30,7 +30,7 @@ const { moveTime } = require("../../utils/move-time");
             it("can only be changed through governance", async () => {
                 await expect(
                     deFiExchangeContract.changeWithdrawFeePercentage(55)
-                ).to.be.revertedWith("Ownable: caller is not the owner");
+                ).to.be.revertedWith("OwnableUnauthorizedAccount");
             });
         });
 

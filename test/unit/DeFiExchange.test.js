@@ -1,6 +1,6 @@
 const chai = require("chai");
 const expect = chai.expect;
-const { network, deployments, ethers } = require("hardhat");
+const { network, deployments, ethers, upgrades } = require("hardhat");
 const { smock } = require("@defi-wonderland/smock");
 const { developmentChains } = require("../../helper-hardhat-config");
 
@@ -76,14 +76,19 @@ chai.use(smock.matchers)
                 swapRouterMockContract.address,
             ];
 
-            deFiExchangeContract = await deFiExchangeContractFactory.deploy(
+            const initializeArgs = [
                 contractAddresses,
                 uniswapPoolFee,
                 withdrawFeePercentage,
-                stakingToGovernancePercentage
-            );
+                stakingToGovernancePercentage,
+                deployer.address
+            ];
 
-            await deFiExchangeContract.deployed();
+            deFiExchangeContract = await upgrades.deployProxy(
+                deFiExchangeContractFactory,
+                initializeArgs,
+                { initializer: 'initialize' }
+            );
         });
 
         describe("changeWithdrawFeePercentage", async () => {
@@ -122,7 +127,7 @@ chai.use(smock.matchers)
                 it("reverts transaction", async () => {
                     await expect(
                         deFiExchangeContract.connect(user).changeWithdrawFeePercentage(withdrawFeePercentage)
-                    ).to.be.revertedWith("Ownable: caller is not the owner");
+                    ).to.be.revertedWith("OwnableUnauthorizedAccount");
                 });
             });
         });

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@aave/periphery-v3/contracts/misc/interfaces/IWrappedTokenGatewayV3.sol";
@@ -33,7 +34,7 @@ error DeFiExchange__InsufficientLiquidityProvidingETHBalance(address sender, uin
 error DeFiExchange__SenderIsNotOwnerOfNFT(address sender, uint256 tokenId);
 error DeFiExchange__RedeemLiquidityETHFail(address sender, uint256 amount);
 
-contract DeFiExchange is ReentrancyGuard, Ownable {
+contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using TransferHelper for address;
 
@@ -43,27 +44,27 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     uint8 public constant AAVE_VARIABLE_RATE = 2; // 1 is stable rate, 2 is variable rate
 
     // Immutable State Variables
-    uint24 public immutable s_uniswapPoolFee;
-    uint8 public immutable s_stakingToGovernancePercentage;
-    address public immutable s_aavePoolAddress;
+    uint24 public s_uniswapPoolFee;
+    uint8 public s_stakingToGovernancePercentage;
+    address public s_aavePoolAddress;
 
     // External Contract References
-    IERC20 public immutable s_DAIToken;
-    IERC20 public immutable s_USDTToken;
-    IWETH public immutable s_WETHToken;
-    ISwapRouter public immutable s_uniswapSwapRouter;
-    IWrappedTokenGatewayV3 public immutable s_aaveWrappedTokenGateway;
-    IPoolAddressesProvider public immutable s_aavePoolAddressesProvider;
-    IPool public immutable s_aavePool;
-    IAaveOracle public immutable s_aaveOracle;
-    GovernanceToken public immutable s_governanceToken;
-    LiquidityPoolNFT public immutable s_liquidityPoolNFT;
+    IERC20 public s_DAIToken;
+    IERC20 public s_USDTToken;
+    IWETH public s_WETHToken;
+    ISwapRouter public s_uniswapSwapRouter;
+    IWrappedTokenGatewayV3 public s_aaveWrappedTokenGateway;
+    IPoolAddressesProvider public s_aavePoolAddressesProvider;
+    IPool public s_aavePool;
+    IAaveOracle public s_aaveOracle;
+    GovernanceToken public s_governanceToken;
+    LiquidityPoolNFT public s_liquidityPoolNFT;
 
     // Regular State Variables
     uint256 public s_daiEthPrice;
     uint8 public s_withdrawFeePercentage;
 
-    struct ContractAddreses {
+    struct ContractAddresses {
         address DAITokenAddress;
         address USDTTokenAddress;
         address WETHTokenAddress;
@@ -113,12 +114,16 @@ contract DeFiExchange is ReentrancyGuard, Ownable {
     event LiquidityRedeemed(address indexed sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
     event ETHLiquidityRedeemd(address indexed sender, uint256 ethAmount);
 
-    constructor(
-        ContractAddreses memory addresses,
+    function initialize(
+        ContractAddresses memory addresses,
         uint24 uniswapPoolFee,
         uint8 withdrawFeePercentage,
-        uint8 stakingToGovernancePercentage
-    ) {
+        uint8 stakingToGovernancePercentage,
+        address initialOwner
+    ) public initializer {
+        __Ownable_init(initialOwner);
+        __ReentrancyGuard_init();
+
         s_DAIToken = IERC20(addresses.DAITokenAddress);
         s_USDTToken = IERC20(addresses.USDTTokenAddress);
         s_WETHToken = IWETH(addresses.WETHTokenAddress);

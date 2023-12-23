@@ -4,14 +4,15 @@ const { ADDRESS_ZERO } = require("../helper-hardhat-config");
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { log } = deployments;
     const { deployer } = await getNamedAccounts();
-    const liquidityPoolNFTContract = await ethers.getContract("LiquidityPoolNFT", deployer);
-    const deFiExchangeContract = await ethers.getContractAt("DeFiExchange", deployer);
+    const liquidityPoolNFTContractDeployment = await deployments.get("LiquidityPoolNFT", deployer);
+    const deFiExchangeContractDeployment = await deployments.get("DeFiExchange", deployer);
+    const liquidityPoolNFTContract = await ethers.getContractAt("LiquidityPoolNFT", liquidityPoolNFTContractDeployment.address);
 
     log("----------------------------------------------------------");
     log("Setting up LiquidityPoolNFT contracts for roles...");
 
     const initializeTx = await liquidityPoolNFTContract.initialize(
-        deFiExchangeContract.address
+        deFiExchangeContractDeployment.address
     );
 
     await initializeTx.wait(1);

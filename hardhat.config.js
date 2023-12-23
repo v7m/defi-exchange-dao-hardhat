@@ -1,6 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
 require("hardhat-deploy");
+require('@openzeppelin/hardhat-upgrades');
 require("solidity-coverage");
 require("hardhat-gas-reporter");
 require("hardhat-contract-sizer");
@@ -75,6 +76,20 @@ module.exports = {
         compilers: [
             {
                 version: "0.8.10",
+                settings: {
+                    optimizer: {
+                        enabled: true,
+                        runs: 200,
+                    },
+                    outputSelection: {
+                        "*": {
+                            "*": ["storageLayout"],
+                        }
+                    }
+                }
+            },
+            {
+                version: "0.8.20",
                 settings: {
                     optimizer: {
                         enabled: true,

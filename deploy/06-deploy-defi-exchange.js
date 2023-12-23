@@ -13,24 +13,28 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deployer } = await getNamedAccounts();
     const chainId = network.config.chainId;
     const waitBlockConfirmations = networkConfig[chainId]["blockConfirmations"] || 1;
-    let DAITokenMockContract, USDTTokenMockContract, governanceTokenContract, DAIContractAddress, USDTContractAddress,
-        uniswapSwapRouterContractAddress, uniswapSwapRouterMockContract;
+    let DAIContractAddress, USDTContractAddress, WETHContractAddress, aaveWrappedTokenGatewayContractAddress,
+        uniswapSwapRouterContractAddress, aavePoolAddressesProviderContractAddress, aaveOraclePoolContractAddress;
+
+    let DAITokenMockContractDeployment, USDTTokenMockContractDeployment, WETHTokenMockContractDeployment,
+        uniswapSwapRouterMockContractDeployment, aaveWrappedTokenGatewayMockContractDeployment,
+        aavePoolAddressesProviderMockContractDeployment, aaveOraclePoolContractDeployment;
 
     if (developmentChains.includes(network.name)) {
-        DAITokenMockContract = await ethers.getContract("DAITokenMock");
-        USDTTokenMockContract = await ethers.getContract("USDTTokenMock");
-        WETHTokenMockContract = await ethers.getContract("WETHTokenMock");
-        uniswapSwapRouterMockContract = await ethers.getContract("SwapRouterMock");
-        aaveWrappedTokenGatewayMockContract = await ethers.getContract("WrappedTokenGatewayMock");
-        aavePoolAddressesProviderMockContract = await ethers.getContract("PoolAddressesProviderMock");
-        aaveOraclePoolContractAddress = await ethers.getContract("AaveOracleMock");
-        DAIContractAddress = DAITokenMockContract.address;
-        USDTContractAddress = USDTTokenMockContract.address;
-        WETHContractAddress = WETHTokenMockContract.address;
-        uniswapSwapRouterContractAddress = uniswapSwapRouterMockContract.address;
-        aaveWrappedTokenGatewayContractAddress = aaveWrappedTokenGatewayMockContract.address;
-        aavePoolAddressesProviderContractAddress = aavePoolAddressesProviderMockContract.address;
-        aaveOraclePoolContractAddress = aaveOraclePoolContractAddress.address;
+        DAITokenMockContractDeployment = await deployments.get("DAITokenMock");
+        USDTTokenMockContractDeployment = await deployments.get("USDTTokenMock");
+        WETHTokenMockContractDeployment = await deployments.get("WETHTokenMock");
+        uniswapSwapRouterMockContractDeployment = await deployments.get("SwapRouterMock");
+        aaveWrappedTokenGatewayMockContractDeployment = await deployments.get("WrappedTokenGatewayMock");
+        aavePoolAddressesProviderMockContractDeployment = await deployments.get("PoolAddressesProviderMock");
+        aaveOraclePoolContractDeployment = await deployments.get("AaveOracleMock");
+        DAIContractAddress = DAITokenMockContractDeployment.address;
+        USDTContractAddress = USDTTokenMockContractDeployment.address;
+        WETHContractAddress = WETHTokenMockContractDeployment.address;
+        uniswapSwapRouterContractAddress = uniswapSwapRouterMockContractDeployment.address;
+        aaveWrappedTokenGatewayContractAddress = aaveWrappedTokenGatewayMockContractDeployment.address;
+        aavePoolAddressesProviderContractAddress = aavePoolAddressesProviderMockContractDeployment.address;
+        aaveOraclePoolContractAddress = aaveOraclePoolContractDeployment.address;
     } else {
         DAIContractAddress = networkConfig[chainId]["DAIContractAddress"];
         USDTContractAddress = networkConfig[chainId]["USDTContractAddress"];
@@ -41,49 +45,61 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         aaveOraclePoolContractAddress = networkConfig[chainId]["aaveOracleAddress"];
     }
 
-    governanceTokenContract = await ethers.getContract("GovernanceToken");
-    liquidityPoolNFTContract = await ethers.getContract("LiquidityPoolNFT");
+    governanceTokenContractDeployment = await deployments.get("GovernanceToken");
+    liquidityPoolNFTContractDeployment = await deployments.get("LiquidityPoolNFT");
 
     const contractAddresses = [
         DAIContractAddress,
         USDTContractAddress,
         WETHContractAddress,
-        liquidityPoolNFTContract.address,
-        governanceTokenContract.address,
+        liquidityPoolNFTContractDeployment.address,
+        governanceTokenContractDeployment.address,
         aaveWrappedTokenGatewayContractAddress,
         aavePoolAddressesProviderContractAddress,
         aaveOraclePoolContractAddress,
         uniswapSwapRouterContractAddress,
     ];
 
-    const args = [
+    const initializeArgs = [
         contractAddresses,
         UNISWAP_POOL_FEE,
         WITHDRAW_FEE_PERCENTAGE,
         STAKING_TO_GOVERNANCE_PERCENTAGE,
+        deployer,
     ];
 
     log("----------------------------------------------------------");
     log("Deploying DeFiExchange contract...");
 
-    const deFiExchange = await deploy("DeFiExchange", {
+    const deploymentDeFiExchangeContract = await deploy("DeFiExchange", {
         from: deployer,
-        args: args,
         log: true,
         waitConfirmations: waitBlockConfirmations,
+        proxy: {
+            proxyContract: 'OpenZeppelinTransparentProxy',
+            viaAdminContract: {
+                name: 'DiFiExchangeProxyAdmin',
+                artifact: 'DiFiExchangeProxyAdmin',
+            },
+            execute: {
+                methodName: "initialize",
+                args: initializeArgs,
+            },
+        },
     });
 
     if (!developmentChains.includes(network.name) && process.env.POLYGONSCAN_API_KEY) {
         log("DeFiExchange contract verifying...");
-        await verifyContract(deFiExchange.address, args);
+        const deFiExchangeImplementationContractDeployment = await deployments.get("DeFiExchange_Implementation");
+        await verifyContract(deFiExchangeImplementationContractDeployment.address, args);
     }
 
     log("DeFiExchange contract deployed!");
     log("Transferring ownership of DeFiExchange contract to TimeLock contact...");
 
-    const deFiExchangeContract = await ethers.getContractAt("DeFiExchange", deFiExchange.address);
-    const timeLock = await ethers.getContract("TimeLock");
-    const transferTx = await deFiExchangeContract.transferOwnership(timeLock.address);
+    const deFiExchangeContract = await ethers.getContractAt("DeFiExchange", deploymentDeFiExchangeContract.address);
+    const timeLockDeployment = await deployments.get("TimeLock");
+    const transferTx = await deFiExchangeContract.transferOwnership(timeLockDeployment.address);
     await transferTx.wait(1);
 
     log("Transferring ownership finished!");
