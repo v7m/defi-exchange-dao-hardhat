@@ -1,11 +1,11 @@
-# DeFi Exchange DAO
+# DeFi Exchange DAO (Hardhat)
 Decentralized Finance Exchange Decentralized Autonomous Organization
 
 [![DFED](https://circleci.com/gh/v7m/defi-exchange-dao-hardhat.svg?style=shield)](https://app.circleci.com/pipelines/github/v7m/defi-exchange-dao-hardhat)
 
 > *This is an educational project with the purpose of acquiring hands-on experience in web3 application development using smart contracts written in Solidity.*
 
-## Description
+# Description
 
 The DeFi Exchange DAO is a multifaceted decentralized finance platform, offering a range of DeFi services and functionalities. It operates with a select group of cryptocurrencies, specifically Ethereum (`ETH`), `DAI`, `USDT`, and Wrapped Ethereum (`WETH`), providing users with various options for their DeFi transactions. Key features of the platform include:
 
@@ -18,13 +18,13 @@ The DeFi Exchange DAO is a multifaceted decentralized finance platform, offering
 
 This platform is designed to be a comprehensive DeFi solution, particularly focusing on `ETH`, `DAI`, and `USDT`, to cater to a broad spectrum of decentralized finance activities.
 
-## Technical description
+# Technical description
 
 <img src="readme-images/schema.png" alt="image" width="500" height="auto" style="display: block; margin-left: auto; margin-right: auto;">
 
 Deployed on the `Polygon` blockchain for its cost-efficiency, the DeFi Exchange DAO platform is crafted using Solidity and employs OpenZeppelin contracts for robust security and standardization, incorporating `ERC20` and `ERC721` standards for token operations. The system integrates with `Aave` and `Uniswap` for diverse DeFi functionalities. It features DAO governance for decentralized decision-making and an upgradable contract architecture, ensuring long-term adaptability and resilience. The platform's reliability is further reinforced through extensive unit and integration testing of all smart contracts.
 
-### Built with
+## Built with
 
 - **Solidity**: Primary language for Ethereum smart contract development.
 - **OpenZeppelin Contracts**: For secure, standard smart contract implementations.
@@ -33,17 +33,17 @@ Deployed on the `Polygon` blockchain for its cost-efficiency, the DeFi Exchange 
 - **Ethers.js**: A JavaScript library used to interact with Ethereum blockchain.
 - **Polygon Blockchain**: Chosen for its high efficiency and reduced transaction costs.
 
-## Smart contract addresses
+# Smart contract addresses
 
-### Polygon Mumbai (testnet)
+## Polygon Mumbai (testnet)
 
-- **DeFi Exchange Implementation Contract**: [0x65dAbFF25f0F5c19Dcc907B5810A92A4BDa39C18](https://mumbai.polygonscan.com//address/0x65dAbFF25f0F5c19Dcc907B5810A92A4BDa39C18)
-- **DeFi Exchange Proxy Contract**: [0x277Ef18fdfc4014a229dA5a6abA9fc5eAd2C8D95](https://mumbai.polygonscan.com//address/0x277Ef18fdfc4014a229dA5a6abA9fc5eAd2C8D95)
-- **DeFi Exchange Proxy Admin Contract**: [0xC36580f93A36EC32261CA10d4CCe885F2b987e0e](https://mumbai.polygonscan.com//address/0xC36580f93A36EC32261CA10d4CCe885F2b987e0e)
-- **Liquidity Pool NFT Contract**: [0xB3bbd06D20B7fCCCDF85074515AeA0EAf3D4Fd7B](https://mumbai.polygonscan.com//address/0xB3bbd06D20B7fCCCDF85074515AeA0EAf3D4Fd7B)
-- **Governance Token Contract**: [0xF54A47b7EE4BC6b49613C0457fb892eA8aD4bFa6](https://mumbai.polygonscan.com//address/0xF54A47b7EE4BC6b49613C0457fb892eA8aD4bFa6)
-- **Governor Contract**: [0x5e1bc89900ef1b4329183DED638B962824F9ad19](https://mumbai.polygonscan.com//address/0x5e1bc89900ef1b4329183DED638B962824F9ad19)
-- **Time Lock Contract**: [0x186b47eFBCbd55a9Bb8ec274dB7CFA3963FD59ad](https://mumbai.polygonscan.com//address/0x186b47eFBCbd55a9Bb8ec274dB7CFA3963FD59ad)
+- **DeFi Exchange Implementation Contract**: [0x3347EA710D0908D6f552a2847E4Dc0c8F82E5c8A](https://mumbai.polygonscan.com//address/0x3347EA710D0908D6f552a2847E4Dc0c8F82E5c8A)
+- **DeFi Exchange Proxy Contract**: [0xe60122D7098237493A9d42fd0131401Be09ba7BF](https://mumbai.polygonscan.com//address/0xe60122D7098237493A9d42fd0131401Be09ba7BF)
+- **DeFi Exchange Proxy Admin Contract**: [0xE30dbe6759373ac5355BD21e93924f0Bcb416434](https://mumbai.polygonscan.com//address/0xE30dbe6759373ac5355BD21e93924f0Bcb416434)
+- **Liquidity Pool NFT Contract**: [0xC0073C1B49EB02f047582bd5f20151A5fB2ed3f7](https://mumbai.polygonscan.com//address/0xC0073C1B49EB02f047582bd5f20151A5fB2ed3f7)
+- **Governance Token Contract**: [0x0936195A7fd9a4b7C2192D2B1325aE9ceE0Ff887](https://mumbai.polygonscan.com//address/0x0936195A7fd9a4b7C2192D2B1325aE9ceE0Ff887)
+- **Governor Contract**: [0xB6FE4cFD10d8738c2eD20F6f181D3a8bcFD1c803](https://mumbai.polygonscan.com//address/0xB6FE4cFD10d8738c2eD20F6f181D3a8bcFD1c803)
+- **Time Lock Contract**: [0x4E34b641c204F17Af9a6bCD2897457afb2DAe14c](https://mumbai.polygonscan.com//address/0x4E34b641c204F17Af9a6bCD2897457afb2DAe14c)
 
 # Getting Started
 
