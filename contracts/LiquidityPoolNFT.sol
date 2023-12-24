@@ -14,6 +14,10 @@ error LiquidityPoolNFT__BurnCallerIsNotOwnerApprovedOrOperator(address sender, u
 error LiquidityPoolNFT__LiquidityPoolContractAlreadySet();
 error LiquidityPoolNFT__AllowedOnlyForLiquidityPoolContract();
 
+/**
+ * @title LiquidityPoolNFT
+ * @dev This contract represents a liquidity pool non-fungible token (NFT).
+ */
 contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
     using Counters for Counters.Counter;
     Counters.Counter private s_tokenCounter;
@@ -26,6 +30,10 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
     event NftBurned(uint256 tokenId, address indexed burner);
     event LiquidityPoolContractSet(address liquidityPoolContractAddress);
 
+    /**
+     * @dev Modifier to restrict access to only the Liquidity Pool contract.
+     * @notice This modifier ensures that the function can only be called by the Liquidity Pool contract.
+     */
     modifier onlyLiquidityPoolContract() {
         if (msg.sender != s_liquidityPoolContractAddress) {
             revert LiquidityPoolNFT__AllowedOnlyForLiquidityPoolContract();
@@ -35,6 +43,10 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
 
     constructor() ERC721("LiquidityPoolNFT", "LPNFT") {}
 
+    /**
+     * @dev Initializes the LiquidityPoolNFT contract by setting the liquidity pool contract address.
+     * @param _liquidityPoolContractAddress The address of the liquidity pool contract.
+     */
     function initialize(address _liquidityPoolContractAddress) external onlyOwner {
         if (s_initialized) {
             revert LiquidityPoolNFT__LiquidityPoolContractAlreadySet();
@@ -45,6 +57,14 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
         emit LiquidityPoolContractSet(_liquidityPoolContractAddress);
     }
 
+    /**
+     * @dev Mint a new NFT for a user with specified amounts of ETH, DAI, and USDT.
+     * @param user The address of the user receiving the NFT.
+     * @param ethAmount The amount of ETH associated with the NFT.
+     * @param daiAmount The amount of DAI associated with the NFT.
+     * @param usdtAmount The amount of USDT associated with the NFT.
+     * @return The ID of the newly minted NFT.
+     */
     function mintNFT(
         address user, 
         uint256 ethAmount, 
@@ -62,6 +82,14 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
         return newItemId;
     }
 
+    /**
+     * @dev Burns an NFT token owned by a specific user.
+     * @param user The address of the user who owns the NFT token.
+     * @param tokenId The ID of the NFT token to be burned.
+     * @notice This function can only be called by the LiquidityPool contract.
+     * @notice The caller must be the owner or have approval to burn the NFT token.
+     * @notice Emits a `NftBurned` event after the NFT token is burned.
+     */
     function burnNFT(address user, uint256 tokenId) external onlyLiquidityPoolContract {
         if (!_isApprovedOrOwner(user, tokenId)) {
             revert LiquidityPoolNFT__BurnCallerIsNotOwnerApprovedOrOperator(user, tokenId);
@@ -70,6 +98,14 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
         emit NftBurned(tokenId, user);
     }
 
+    /**
+     * @dev Generates the token URI for a Liquidity Pool NFT.
+     * @param tokenId The ID of the token.
+     * @param ethAmount The amount of ETH in the liquidity pool.
+     * @param daiAmount The amount of DAI in the liquidity pool.
+     * @param usdtAmount The amount of USDT in the liquidity pool.
+     * @return The generated token URI.
+     */
     function generateTokenURI(
         uint256 tokenId, 
         uint256 ethAmount,
@@ -108,10 +144,18 @@ contract LiquidityPoolNFT is ERC721URIStorage, Ownable {
         return string(dataURI);
     }
 
+    /**
+     * @dev Retrieves the address of the liquidity pool contract.
+     * @return The address of the liquidity pool contract.
+     */
     function getLiquidityPoolContractAddress() external view returns (address) {
         return s_liquidityPoolContractAddress;
     }
 
+    /**
+     * @dev Returns the current token counter.
+     * @return The current token counter as a uint256 value.
+     */
     function getTokenCounter() public view returns (uint256) {
         return s_tokenCounter.current();
     }

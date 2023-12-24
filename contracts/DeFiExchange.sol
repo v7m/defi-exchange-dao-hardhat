@@ -34,6 +34,11 @@ error DeFiExchange__InsufficientLiquidityProvidingETHBalance(address sender, uin
 error DeFiExchange__SenderIsNotOwnerOfNFT(address sender, uint256 tokenId);
 error DeFiExchange__RedeemLiquidityETHFail(address sender, uint256 amount);
 
+/**
+ * @title DeFiExchange
+ * @dev This contract represents a decentralized finance exchange.
+ * @notice This contract allows users to trade tokens and provides various functionalities for managing the exchange.
+ */
 contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using TransferHelper for address;
@@ -114,6 +119,14 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
     event LiquidityRedeemed(address indexed sender, uint256 NFTTokenId, uint256 ethAmount, uint256 usdtAmount, uint256 daiAmount);
     event ETHLiquidityRedeemd(address indexed sender, uint256 ethAmount);
 
+    /**
+     * @dev Initializes the DeFiExchange contract with the provided parameters.
+     * @param addresses The contract addresses for various tokens and contracts.
+     * @param uniswapPoolFee The fee percentage for Uniswap pool transactions.
+     * @param withdrawFeePercentage The fee percentage for withdrawals.
+     * @param stakingToGovernancePercentage The percentage of staking rewards allocated to governance.
+     * @param initialOwner The initial owner of the contract.
+     */
     function initialize(
         ContractAddresses memory addresses,
         uint24 uniswapPoolFee,
@@ -140,16 +153,29 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         s_stakingToGovernancePercentage = stakingToGovernancePercentage;
     }
 
+    /**
+     * @dev Fallback function that allows the contract to receive Ether.
+     * It calls the `depositETH` function with the received Ether value.
+     */
     fallback() external payable {
         this.depositETH{value: msg.value}();
     }
 
+    /**
+     * @dev Receive function that allows the contract to receive Ether.
+     * It calls the `depositETH` function with the received Ether value.
+     */
     receive() external payable {
         this.depositETH{value: msg.value}();
     }
 
     // EXTERNAL FUNCTIONS
 
+    /**
+     * @dev Changes the withdrawal fee percentage.
+     * @dev Only the contract owner can call this function.
+     * @param _withdrawFeePercentage The new withdrawal fee percentage.
+     */
     function changeWithdrawFeePercentage(uint8 _withdrawFeePercentage) external onlyOwner {
         if (_withdrawFeePercentage > 100) {
             revert DeFiExchange__InvalidNewWithdrawFeePercentage(s_withdrawFeePercentage, _withdrawFeePercentage);
@@ -158,6 +184,12 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit WithdrawFeePercentageChanged(s_withdrawFeePercentage);
     }
 
+    /**
+     * @dev Provides liquidity to the DeFi exchange by depositing tokens and/or Ether.
+     * @param usdtAmount The amount of USDT tokens to provide as liquidity.
+     * @param daiAmount The amount of DAI tokens to provide as liquidity.
+     * @return The ID of the liquidity pool NFT token minted for the liquidity provider.
+     */
     function provideLiquidity(
         uint256 usdtAmount,
         uint256 daiAmount
@@ -177,6 +209,12 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         return liquidityPoolNFTTokenId;
     }
 
+    /**
+     * @dev Redeems liquidity by burning the liquidity pool NFT token and returning the deposited tokens and Ether 
+     * to the liquidity provider.
+     * @dev Only the owner of the NFT token can call this function.
+     * @param tokenId The ID of the liquidity pool NFT token to redeem.
+     */
     function redeemLiquidity(uint256 tokenId) external nonReentrant {
         if (!_isNFTOwner(msg.sender, tokenId)) {
             revert DeFiExchange__SenderIsNotOwnerOfNFT(msg.sender, tokenId);
@@ -200,6 +238,10 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit LiquidityRedeemed(msg.sender, tokenId, ethAmount, daiAmount, usdtAmount);
     }
 
+    /**
+     * @dev Deposits ETH to Aave protocol.
+     * @param amount The amount of ETH to deposit.
+     */
     function depositETHToAave(uint256 amount) external nonReentrant {
         UserBalances storage userBalances = s_userBalances[msg.sender];
         if (userBalances.ethBalance < amount) {
@@ -213,6 +255,9 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit ETHDepositedToAave(msg.sender, amount);
     }
 
+    /**
+     * @dev Allows the user to borrow DAI from Aave.
+     */
     function borrowDAIFromAave() external nonReentrant {
         UserBalances storage userBalances = s_userBalances[msg.sender];
         if (userBalances.ethDepositedToAave == 0) {
@@ -227,14 +272,27 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit BorrowedDAIFromAave(msg.sender, priceDAI, safeMaxDAIBorrow);
     }
 
+    /**
+     * @dev Swaps a specified amount of DAI tokens to USDT tokens.
+     * @param amount The amount of DAI tokens to swap.
+     */
     function swapDaiToUsdt(uint256 amount) external {
         performTokensSwap(address(s_DAIToken), address(s_USDTToken), amount);
     }
 
+    /**
+     * @dev Swaps a specified amount of USDT tokens to DAI tokens.
+     * @param amount The amount of USDT tokens to swap.
+     */
     function swapUsdtToDai(uint256 amount) external {
         performTokensSwap(address(s_USDTToken), address(s_DAIToken), amount);
     }
 
+    /**
+     * @dev Stake ETH for governance.
+     * @notice This function allows users to stake ETH in exchange for governance tokens.
+     * @dev The amount of ETH staked will be used to calculate the amount of governance tokens to mint.
+     */
     function stakeETHForGovernance() external payable nonReentrant {
         uint256 stakingAmount = msg.value;
         if (stakingAmount == 0) {
@@ -248,6 +306,12 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit StakedETHForGovernance(msg.sender, stakingAmount, governanceAmount);
     }
 
+    /**
+     * @dev Withdraws the staked ETH for governance tokens.
+     * @notice This function allows users to withdraw their staked ETH and receive governance tokens in return.
+     * @dev The amount of governance tokens received is calculated based on the staked ETH amount.
+     * @dev The staked ETH is burned and the corresponding amount is transferred back to the user.
+     */
     function withdrawStakedETHForGovernance() external nonReentrant {
         UserBalances storage userBalances = s_userBalances[msg.sender];
         uint256 stakedAmount = userBalances.ethStaked;
@@ -264,6 +328,12 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit WithdrawStakedETHForGovernance(msg.sender, stakedAmount, governanceAmount);
     }
 
+    /**
+     * @dev Withdraws ETH from the contract to the caller's address.
+     * @notice This function allows the caller to withdraw their ETH balance from the contract.
+     * @dev The caller's ETH balance is transferred to their address, after deducting the withdrawal fee.
+     * @dev The withdrawal fee is calculated based on the total withdrawal amount.
+     */
     function withdrawETH() external nonReentrant() {
         UserBalances storage userBalances = s_userBalances[msg.sender];
         uint256 totalAmount = userBalances.ethBalance;
@@ -281,95 +351,187 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit ETHWithdrawn(msg.sender, withdrawAmount);
     }
 
+    /**
+     * @dev Withdraws DAI tokens from the contract.
+     */
     function withdrawDAI() external nonReentrant() {
         _withdrawToken(s_DAIToken);
     }
 
+    /**
+     * @dev Withdraws USDT tokens from the contract.
+     */
     function withdrawUSDT() external nonReentrant() {
         _withdrawToken(s_USDTToken);
     }
 
+    /**
+     * @dev Deposits ETH into the contract.
+     * @notice This function allows users to deposit ETH into the contract.
+     */
     function depositETH() external payable {
         UserBalances storage userBalances = s_userBalances[msg.sender];
         userBalances.ethBalance += msg.value;
         emit ETHDeposited(msg.sender, msg.value);
     }
 
+    /**
+     * @dev Deposits a specified amount of DAI tokens into the contract.
+     * @param _amount The amount of DAI tokens to deposit.
+     */
     function depositDAI(uint256 _amount) external nonReentrant {
         _depositToken(s_DAIToken, _amount);
     }
 
+    /**
+     * @dev Deposits a specified amount of USDT tokens into the contract.
+     * @param _amount The amount of USDT tokens to deposit.
+     */
     function depositUSDT(uint256 _amount) external nonReentrant {
         _depositToken(s_USDTToken, _amount);
     }
 
     // GETTER FUNCTIONS
 
+    /**
+     * @dev Retrieves the withdrawal fee percentage.
+     * @return The withdrawal fee percentage as a uint8 value.
+     */
     function getWithdrawFeePercentage() external view returns (uint8) {
         return s_withdrawFeePercentage;
     }
 
+    /**
+     * @dev Retrieves the ETH balance of the caller.
+     * @return The ETH balance of the caller.
+     */
     function getUserETHBalance() external view returns (uint256) {
         return s_userBalances[msg.sender].ethBalance;
     }
 
+    /**
+     * @dev Retrieves the DAI token balance of the calling user.
+     * @return The DAI token balance of the calling user.
+     */
     function getUserDAIBalance() external view returns (uint256) {
         return s_userBalances[msg.sender].tokensBalances[address(s_DAIToken)];
     }
 
+    /**
+     * @dev Retrieves the USDT balance of the caller.
+     * @return The USDT balance of the caller.
+     */
     function getUserUSDTBalance() external view returns (uint256) {
         return s_userBalances[msg.sender].tokensBalances[address(s_USDTToken)];
     }
+
+    /**
+     * @dev Retrieves the WETH balance of the caller.
+     * @return The WETH balance of the caller.
+     */
     function getUserWETHBalance() external view returns (uint256) {
         return s_userBalances[msg.sender].tokensBalances[address(s_WETHToken)];
     }
 
+    /**
+     * @dev Returns the total amount of ETH fees collected by the contract.
+     * @return The total amount of ETH fees collected.
+     */
     function getTotalETHFees() external view returns (uint256) {
         return s_feesAmounts.ethFees;
     }
 
+    /**
+     * @dev Returns the total fees collected in DAI tokens.
+     * @return The total amount of DAI fees collected.
+     */
     function getTotalDAIFees() external view returns (uint256) {
         return s_feesAmounts.tokensFees[address(s_DAIToken)];
     }
 
+    /**
+     * @dev Returns the total amount of USDT fees collected by the contract.
+     * @return The total amount of USDT fees.
+     */
     function getTotalUSDTFees() external view returns (uint256) {
         return s_feesAmounts.tokensFees[address(s_USDTToken)];
     }
 
+    /**
+     * @dev Retrieves the amount of ETH in the liquidity pool.
+     * @return The amount of ETH in the liquidity pool.
+     */
     function getLiquidityPoolETHAmount() external view returns (uint256) {
         return s_liquidityProvidedAmounts.ethAmount;
     }
 
+    /**
+     * @dev Retrieves the amount of DAI tokens in the liquidity pool.
+     * @return The amount of DAI tokens in the liquidity pool.
+     */
     function getLiquidityPoolDAIAmount() external view returns (uint256) {
         return s_liquidityProvidedAmounts.tokensAmounts[address(s_DAIToken)];
     }
 
+    /**
+     * @dev Retrieves the amount of USDT tokens in the liquidity pool.
+     * @return The amount of USDT tokens in the liquidity pool.
+     */
     function getLiquidityPoolUSDTAmount() external view returns (uint256) {
         return s_liquidityProvidedAmounts.tokensAmounts[address(s_USDTToken)];
     }
 
+    /**
+     * @dev Retrieves the amount of ETH liquidity provided by the user for a specific NFT token.
+     * @param nftTokenId The ID of the NFT token.
+     * @return The amount of ETH liquidity provided by the user for the specified NFT token.
+     */
     function getNFTUserETHLiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
         return s_userBalances[msg.sender].nftEthLiquidityProvided[nftTokenId];
     }
 
+    /**
+     * @dev Retrieves the amount of USDT liquidity provided by the user for a specific NFT token.
+     * @param nftTokenId The ID of the NFT token.
+     * @return The amount of USDT liquidity provided by the user for the specified NFT token.
+     */
     function getNFTUserUSDTLiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
         return s_userBalances[msg.sender].nftTokensLiquidityProvided[nftTokenId][address(s_USDTToken)];
     }
 
+    /**
+     * @dev Retrieves the amount of DAI liquidity provided by the user for a specific NFT token.
+     * @param nftTokenId The ID of the NFT token.
+     * @return The amount of DAI liquidity provided by the user for the specified NFT token.
+     */
     function getNFTUserDAILiquidityPoolAmount(uint256 nftTokenId) external view returns (uint256) {
         return s_userBalances[msg.sender].nftTokensLiquidityProvided[nftTokenId][address(s_DAIToken)];
     }
 
+    /**
+     * @dev Returns the total amount of ETH deposited by the user to Aave.
+     * @return The total amount of ETH deposited by the user to Aave.
+     */
     function getUserTotalDepositedETHtoAave() external view returns (uint256) {
         return s_userBalances[msg.sender].ethDepositedToAave;
     }
 
+    /**
+     * @dev Retrieves the amount of ETH staked by the user.
+     * @return The amount of ETH staked by the user.
+     */
     function getUserEthStaked() external view returns (uint256) {
         return s_userBalances[msg.sender].ethStaked;
     }
 
     // PUBLIC FUNCTIONS
 
+    /**
+     * @dev Performs a token swap using the Uniswap protocol.
+     * @param tokenInAddress The address of the token to be swapped.
+     * @param tokenOutAddress The address of the token to receive in the swap.
+     * @param amountIn The amount of tokenIn to be swapped.
+     */
     function performTokensSwap(
         address tokenInAddress,
         address tokenOutAddress,
@@ -399,6 +561,11 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit UniswapTokensSwapPerformed(tokenInAddress, tokenOutAddress, amountIn, amountOut);
     }
 
+    /**
+     * @dev Calculates the amount of governance tokens to be rewarded based on the provided ETH amount.
+     * @param ethAmount The amount of ETH to calculate governance tokens for.
+     * @return The amount of governance tokens to be rewarded.
+     */
     function calculateGovernanceTokensAmount(uint256 ethAmount) public view returns (uint256) {
         uint256 governanceAmount = (ethAmount * s_stakingToGovernancePercentage) / 100;
 
@@ -407,6 +574,14 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
 
     // PRIVATE FUNCTIONS
 
+    /**
+     * @dev Processes the liquidity providing for a specific token.
+     * @dev This function transfers the specified amount of tokens from the caller to the contract,
+     * and updates the liquidityProvidedAmounts mapping with the provided amount.
+     * @param token The ERC20 token to provide liquidity for.
+     * @param amount The amount of tokens to provide as liquidity.
+     * @param tokenAddress The address of the token.
+     */
     function _processTokenLiquidityProviding(IERC20 token, uint256 amount, address tokenAddress) private {
         if (amount > 0) {
             if (token.allowance(msg.sender, address(this)) < amount) {
@@ -417,6 +592,14 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         }
     }
 
+    /**
+     * @dev Saves the liquidity provided by a user for a specific NFT token.
+     * @param user The address of the user providing liquidity.
+     * @param tokenId The ID of the NFT token.
+     * @param ethAmount The amount of ETH liquidity provided.
+     * @param daiAmount The amount of DAI liquidity provided.
+     * @param usdtAmount The amount of USDT liquidity provided.
+     */
     function _saveNFTLiquidity(
         address user,
         uint256 tokenId,
@@ -430,6 +613,14 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         userBalances.nftTokensLiquidityProvided[tokenId][address(s_USDTToken)] = usdtAmount;
     }
 
+    /**
+     * @dev Internal function to process the redemption of token liquidity.
+     * @param token The ERC20 token being redeemed.
+     * @param user The address of the user redeeming the liquidity.
+     * @param amount The amount of tokens being redeemed.
+     * @param tokenAddress The address of the token being redeemed.
+     * @param tokenId The ID of the NFT token being redeemed.
+     */
     function _processTokenLiquidityRedeeming(
         IERC20 token,
         address user,
@@ -444,6 +635,10 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         }
     }
 
+    /**
+     * @dev Withdraws tokens from the contract for the calling user.
+     * @param token The ERC20 token to withdraw.
+     */
     function _withdrawToken(IERC20 token) private {
         UserBalances storage userBalances = s_userBalances[msg.sender];
         address tokenAddress = address(token);
@@ -462,6 +657,11 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit TokenWithdrawn(tokenAddress, msg.sender, withdrawAmount);
     }
 
+    /**
+     * @dev Deposits a specified amount of tokens into the contract.
+     * @param token The ERC20 token to deposit.
+     * @param amount The amount of tokens to deposit.
+     */
     function _depositToken(IERC20 token, uint256 amount) private {
         address tokenAddress = address(token);
         if (token.allowance(msg.sender, address(this)) < amount) {
@@ -472,11 +672,22 @@ contract DeFiExchange is Initializable, OwnableUpgradeable, ReentrancyGuardUpgra
         emit TokenDeposited(tokenAddress, msg.sender, amount);
     }
 
+    /**
+     * @dev Checks if the given user is the owner of the specified NFT token.
+     * @param user The address of the user to check ownership for.
+     * @param tokenId The ID of the NFT token to check ownership for.
+     * @return A boolean value indicating whether the user is the owner of the NFT token.
+     */
     function _isNFTOwner(address user, uint256 tokenId) private view returns (bool) {
         address owner = s_liquidityPoolNFT.ownerOf(tokenId);
         return owner == user;
     }
 
+    /**
+     * @dev Calculates the withdrawal fee for a given amount.
+     * @param amount The amount for which to calculate the withdrawal fee.
+     * @return The withdrawal fee amount.
+     */
     function _calculateWithdrawalFee(uint256 amount) private view returns (uint256) {
         uint256 fee = (amount * s_withdrawFeePercentage) / 100;
 

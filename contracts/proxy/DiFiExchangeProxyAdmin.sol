@@ -4,6 +4,11 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
+/**
+ * @title DiFiExchangeProxyAdmin
+ * @dev A contract that extends the functionality of the ProxyAdmin contract.
+ * @dev It is used as the admin contract for the DiFiExchangeProxy contract.
+ */
 contract DiFiExchangeProxyAdmin is ProxyAdmin {
     constructor(
         address /* owner */
