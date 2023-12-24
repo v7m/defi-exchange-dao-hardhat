@@ -91,7 +91,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     if (!developmentChains.includes(network.name) && process.env.POLYGONSCAN_API_KEY) {
         log("DeFiExchange contract verifying...");
         const deFiExchangeImplementationContractDeployment = await deployments.get("DeFiExchange_Implementation");
-        await verifyContract(deFiExchangeImplementationContractDeployment.address, args);
+        await verifyContract(deFiExchangeImplementationContractDeployment.address);
     }
 
     log("DeFiExchange contract deployed!");
