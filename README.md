@@ -37,13 +37,13 @@ Deployed on the `Polygon` blockchain for its cost-efficiency, the DeFi Exchange 
 
 ## Polygon Mumbai (testnet)
 
-- **DeFi Exchange Implementation Contract**: [0x3347EA710D0908D6f552a2847E4Dc0c8F82E5c8A](https://mumbai.polygonscan.com//address/0x3347EA710D0908D6f552a2847E4Dc0c8F82E5c8A)
+- **DeFi Exchange Implementation Contract**: [0x3347EA710D0908D6f552a2847E4Dc0c8F82E5c8A](https://mumbai.polygonscan.com/address/0x3347EA710D0908D6f552a2847E4Dc0c8F82E5c8A)
 - **DeFi Exchange Proxy Contract**: [0xe60122D7098237493A9d42fd0131401Be09ba7BF](https://mumbai.polygonscan.com//address/0xe60122D7098237493A9d42fd0131401Be09ba7BF)
-- **DeFi Exchange Proxy Admin Contract**: [0xE30dbe6759373ac5355BD21e93924f0Bcb416434](https://mumbai.polygonscan.com//address/0xE30dbe6759373ac5355BD21e93924f0Bcb416434)
+- **DeFi Exchange Proxy Admin Contract**: [0xE30dbe6759373ac5355BD21e93924f0Bcb416434](https://mumbai.polygonscan.com/address/0xE30dbe6759373ac5355BD21e93924f0Bcb416434)
 - **Liquidity Pool NFT Contract**: [0xC0073C1B49EB02f047582bd5f20151A5fB2ed3f7](https://mumbai.polygonscan.com//address/0xC0073C1B49EB02f047582bd5f20151A5fB2ed3f7)
 - **Governance Token Contract**: [0x0936195A7fd9a4b7C2192D2B1325aE9ceE0Ff887](https://mumbai.polygonscan.com//address/0x0936195A7fd9a4b7C2192D2B1325aE9ceE0Ff887)
-- **Governor Contract**: [0xB6FE4cFD10d8738c2eD20F6f181D3a8bcFD1c803](https://mumbai.polygonscan.com//address/0xB6FE4cFD10d8738c2eD20F6f181D3a8bcFD1c803)
-- **Time Lock Contract**: [0x4E34b641c204F17Af9a6bCD2897457afb2DAe14c](https://mumbai.polygonscan.com//address/0x4E34b641c204F17Af9a6bCD2897457afb2DAe14c)
+- **Governor Contract**: [0xB6FE4cFD10d8738c2eD20F6f181D3a8bcFD1c803](https://mumbai.polygonscan.com/address/0xB6FE4cFD10d8738c2eD20F6f181D3a8bcFD1c803)
+- **Time Lock Contract**: [0x4E34b641c204F17Af9a6bCD2897457afb2DAe14c](https://mumbai.polygonscan.com/address/0x4E34b641c204F17Af9a6bCD2897457afb2DAe14c)
 
 # Getting Started
 
